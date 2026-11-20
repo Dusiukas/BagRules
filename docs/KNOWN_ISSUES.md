@@ -2,7 +2,7 @@
 
 ## Recovery and source state
 
-1. **The 0.7.4-alpha.1 combat fix still needs live verification.** Source and installed files are updated, but an enter-combat bag refresh and post-combat rebuild must be observed in game.
+1. **The 0.7.4-alpha.2 combat fix has only a basic live check.** Alpha.1 still went flat when items changed in combat. The owner reported on 2026-11-20 that alpha.2 works in game. The `/bagrules status` state, taint log, bank/offline and list mode in combat were not recorded.
 2. **The latest described 0.7.5 source is missing.** The conversation claims selectable parent categories and links ZIP/source/test downloads, but no durable copy was recovered.
 3. **Two referenced intermediate archives are missing.** 0.2.2 and 0.3.1 are described in history but were not found.
 4. **The original ChatGPT export directory was absent.** Recovery used the two user-supplied shared conversations. Unshared/branched messages may therefore be absent.

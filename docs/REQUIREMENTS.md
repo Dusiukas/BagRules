@@ -42,7 +42,7 @@ Status terms:
 | R-028 | Survive EUI updates without reverting to an old layout | Not guaranteed | Not guaranteed | Regression observed by user; compatibility contract/tests needed |
 | R-029 | Support bags and bank consistently | Bags primary; bank adapter path | Bags primary; bank limitations | Bank/offline behavior remains unverified and historically flatter |
 | R-030 | Never sell, destroy, mail, deposit, or physically rearrange items | Implemented boundary | Implemented boundary | Must remain invariant |
-| R-031 | Preserve the last valid hierarchy during combat and rebuild after combat | Flat fallback | Implemented in alpha.1 | Installed locally; live combat verification required |
+| R-031 | Keep the hierarchy during combat and rebuild after combat | Flat fallback | alpha.1 deferral failed live (went flat); alpha.2 repaints unprotected frames in combat | Owner reported alpha.2 working live (2026-11-20); taint log and bank/list cases unrecorded |
 
 ## User experience requirements
 

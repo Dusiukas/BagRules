@@ -22,13 +22,13 @@ See the [BagRules screenshot gallery](SCREENSHOTS.md) for the category manager, 
 
 ## Repository status
 
-The current development source is **0.7.4-alpha.1**. It updates the repository to the recovered 0.7.4 code and adds a combat hierarchy hotfix: valid green parent headers and grouped sidebar state are retained during combat, then rebuilt on a delayed refresh after combat ends.
+The current development source is **0.7.4-alpha.2**. It updates the repository to the recovered 0.7.4 code and adds combat hierarchy fixes: green parent headers and the grouped sidebar are repainted when inventory changes in combat (when the host frames involved are unprotected), deferred otherwise, and rebuilt after combat ends.
 
 A conversation describes a later **0.7.5-alpha** build with selectable parent categories, but that source archive has not been recovered. Parent headers in 0.7.4 group and collapse children; they do not select an aggregate parent view.
 
 | Evidence | State |
 |---|---|
-| Checked-in `BagRules/` | 0.7.4-alpha.1; current development source |
+| Checked-in `BagRules/` | 0.7.4-alpha.2; current development source |
 | Original recovered package | 0.7.4-alpha; preserved privately and locally |
 | Conversation-only build | 0.7.5-alpha; attachment missing |
 
@@ -64,7 +64,7 @@ The checked-in TOC targets interface `16001`. Other clients and EUI releases hav
 
 ## Verification status
 
-No executable test harness or test fixtures were found in the repository or any of the 17 recovered release ZIPs. Historical release notes claim mock tests, but those results cannot currently be reproduced. The combat fix has been statically reviewed and installed locally, but still requires a live enter-combat/leave-combat test. Other WoW/EUI layout, taint, bank, offline inventory, and upgrade behavior also require testing. See [Testing](docs/TESTING.md).
+No executable test harness or test fixtures were found in the repository or any of the 17 recovered release ZIPs. Historical release notes claim mock tests, but those results cannot currently be reproduced. The owner reported the alpha.2 combat fix working in game; taint-log and edge-case checks are not yet recorded. Other WoW/EUI layout, taint, bank, offline inventory, and upgrade behavior also require testing. See [Testing](docs/TESTING.md).
 
 ## Contributing and privacy
 

@@ -10,7 +10,7 @@ BagRules adds rule-driven inventory categories to WoW Forever while preserving E
 - GitHub remote: `https://github.com/Dusiukas/BagRules.git`
 - Branch: `main`, tracking `origin/main`
 - Verified migration baseline: commit `493e981`, clean before documentation work
-- Active addon version: `0.7.4-alpha.1` (recovered 0.7.4 plus combat hierarchy hotfix)
+- Active addon version: `0.7.4-alpha.2` (recovered 0.7.4 plus combat hierarchy fixes)
 - Private history: `%USERPROFILE%\Desktop\BagRules-History`
 - Original requested export location: `%USERPROFILE%\Desktop\ChatGPT-Export` (not present during recovery)
 

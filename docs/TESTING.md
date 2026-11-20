@@ -11,7 +11,7 @@
 | Historical mock-test claims | Not reproducible |
 | Live WoW Forever/EUI testing | Incomplete / not independently reproduced |
 | 0.7.5 parent-selection testing | Impossible until source/archive recovery |
-| Combat hierarchy hotfix | Installed locally; live verification pending |
+| Combat hierarchy hotfix | alpha.1 observed going flat in combat; alpha.2 owner-reported working in game (2026-11-20); taint log not recorded |
 
 No release should say only “tested.” Name the BagRules version, client/interface, EUI version, test type, and result.
 

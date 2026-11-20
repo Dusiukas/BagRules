@@ -332,27 +332,53 @@ function S:Header(i,child)
     return b
 end
 S.ownFrames=setmetatable({}, {__mode='k'})
+-- IsProtected() is true for explicitly protected frames and for frames that are
+-- implicitly protected through protected descendants/anchors. Those cannot be
+-- moved in combat. Plain host frames can, and the host itself reflows them.
+local function protected(f) return f and type(f.IsProtected)=='function' and f:IsProtected() and true or false end
+local function combatMovable(plan,child,sf)
+    if protected(child) or protected(sf) then return false end
+    for _,m in ipairs(plan.moves) do if protected(m.p.f) then return false end end
+    return true
+end
+-- True while the first repositioned host frame is still where our last paint
+-- put it, so retained headings still line up with the host layout.
+function S:LayoutIntact(child)
+    local last=self.last; if not last or not child or not shown(last.f) then return false end
+    local p=position(last.f,child)
+    return p and abs(p.x-last.x)<=0.1 and abs(p.y-last.y)<=0.1 or false
+end
+function S:Defer(child,why)
+    self.deferred=true; BR.pendingRefresh=true
+    -- Keep valid headings; drop stale ones so they never float over a host
+    -- layout that was rebuilt underneath them.
+    if self:LayoutIntact(child) then self.state='deferred (combat'..(why and ', '..why or '')..')'
+    else self:HideHeaders(); self.last=nil; self.state='flat until combat ends ('..(why or 'protected frames')..')' end
+end
 function S:AfterRefresh(bag)
     if self.busy then return end
     if not bag:IsVisible() or not BR.db or not BR.db.enabled or not BR.db.view or BR.db.sectionLayout~='hierarchy' or self.failed then
-        self.deferred=false; self:HideHeaders(); return
+        self.deferred=false; self.last=nil; self:HideHeaders(); return
     end
-    -- Preserve the last validated hierarchy during combat. RefreshInventory can
-    -- run while protected frames cannot safely be reflowed; hiding our headings
-    -- here exposed the host's flat labels until combat ended.
-    if combat() then
-        self.deferred=true; BR.pendingRefresh=true; self.state='deferred (combat)'; return
+    -- 0.7.4-alpha.1 skipped all work in combat, but EUI's RefreshInventory still
+    -- rebuilt its flat layout, so loot in combat flattened the bags. Repaint in
+    -- combat when no frame we touch is protected; otherwise defer (see Defer).
+    local inCombat=combat()
+    if not inCombat then self.deferred=false; self.last=nil; self:HideHeaders() end
+    if hasCursor() or activeCatch(bag) or bag.IsListMode() then
+        if inCombat then self:Defer(bag._scrollChild,'cursor or selection'); return end
+        self.state='flat (cursor, selection or list mode)'; return
     end
-    self.deferred=false; self:HideHeaders()
-    if hasCursor() or activeCatch(bag) or bag.IsListMode() then self.state='flat (cursor, selection or list mode)'; return end
-    local view,reason=self:Selected(bag); if not view then self.state='flat: '..tostring(reason); return end
-    if not bag._scrollChild or type(bag._scrollChild.GetHeight)~='function' then self.state='flat: scroll child geometry unavailable'; return end
+    local view,reason=self:Selected(bag)
+    if not view then if inCombat then self:Defer(bag._scrollChild,tostring(reason)) else self.state='flat: '..tostring(reason) end; return end
+    if not bag._scrollChild or type(bag._scrollChild.GetHeight)~='function' then if inCombat then self:Defer(nil,'scroll child unavailable') else self.state='flat: scroll child geometry unavailable' end; return end
     local child=bag._scrollChild
     local changed={}; local oldH=child and child:GetHeight()
+    local deferNow
     self.busy=true
     local ok,err=pcall(function()
         local blocks,left,right,reordered=self:Collect(bag,view)
-        if not blocks then self.state='flat: '..tostring(left); return end
+        if not blocks then if inCombat then self:Defer(child,tostring(left)) else self.state='flat: '..tostring(left) end; return end
         local search=bag._appliedSearch and bag._appliedSearch~=''
         local plan
         if bag.IsCompactMode() and BR.db.tightCompact~=false then
@@ -369,7 +395,10 @@ function S:AfterRefresh(bag)
         -- is disabled or the host has no supported measurement contract.
         local dense=plan~=nil
         if not plan then plan=self.Plan(blocks,self.collapsed,search,left,right,oldH,reordered) end
-        if not plan or #plan.headers==0 then self.state='flat: no sections'; return end
+        if not plan or #plan.headers==0 then if inCombat then self:Defer(child,'no sections') else self.state='flat: no sections' end; return end
+        -- Never touch a protected frame in combat. Decide before any write.
+        if inCombat and not combatMovable(plan,child,bag._scrollFrame) then deferNow=true; return end
+        if inCombat then self:HideHeaders() end
         -- Pre-create only plain header buttons. Never create or alter a secure item button.
         for i,h in ipairs(plan.headers) do
             local b=self:Header(i,child); b:ClearAllPoints(); b:SetPoint('TOPLEFT',child,'TOPLEFT',h.x,h.y); b:SetWidth(h.w)
@@ -395,12 +424,17 @@ function S:AfterRefresh(bag)
         if sf then sf:SetVerticalScroll(min(sf:GetVerticalScroll(),sf:GetVerticalScrollRange())) end
         for i=1,#plan.headers do self.headers[i]:Show() end
         if bag._updateThumb then bag._updateThumb() end
-        self.state='runtime nested ('..#plan.headers..' sections)'
+        self.last=nil
+        for _,m in ipairs(plan.moves) do if not m.hide then self.last={f=m.p.f,x=m.x,y=m.y}; break end end
+        self.deferred=false
+        self.state='runtime nested ('..#plan.headers..' sections'..(inCombat and ', combat repaint' or '')..')'
         self.density=dense and 'compact' or 'native bands'
     end)
+    if ok and deferNow then self.busy=false; self:Defer(child); return end
     if not ok then
         -- Best-effort rollback of the native layout before disabling this session.
-        if not combat() then
+        -- In combat, writes only reached frames already checked as unprotected.
+        if not combat() or #changed>0 then
             for i=#changed,1,-1 do local m=changed[i]; local p=m.p; pcall(function() p.f:ClearAllPoints(); p.f:SetPoint('TOPLEFT',child,'TOPLEFT',p.x,p.y); if m.label then p.f._label:SetText(m.label) end; if m.visual then restoreLabel(p.f,m.visual) end; p.f:Show() end) end
             if oldH then pcall(child.SetHeight,child,oldH) end
         end

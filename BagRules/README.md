@@ -1,3 +1,9 @@
+# BagRules 0.7.4-alpha.2 — Combat repaint fix
+
+- Alpha.1 still showed flat bags when items changed in combat, because EUI rebuilds its own layout in combat. Parent headers and the grouped sidebar are now repainted in combat when the frames involved are unprotected, and deferred otherwise.
+- Stale headings are hidden rather than left over rebuilt rows. The open bag is repainted once after combat if needed.
+- Owner-reported working in game. Taint log and edge cases not yet recorded.
+
 # BagRules 0.7.4-alpha.1 — Combat hierarchy hotfix
 
 - Parent headers and the grouped native sidebar now preserve their last validated layout when bags refresh during combat instead of immediately falling back to plain per-category labels.

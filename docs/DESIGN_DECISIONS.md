@@ -53,3 +53,7 @@ Recovered 0.6+ code represents common metadata choices as bounded sets, flags, n
 ## D-013 — Historical claims are not verification
 
 Release summaries, generated download links, and assistant test statements are useful leads, not proof. A feature is called live-tested only when the environment and reproducible evidence are available. Missing attachments are documented as missing.
+
+## D-014 — Repaint in combat only when the moved frames are unprotected
+
+Alpha.1 skipped all layout work in combat. In game this still went flat, because EUI rebuilds its own flat layout on combat-time inventory refreshes. Alpha.2 checks `IsProtected()` on the scroll child, the scroll frame, and every frame in the plan. If none are protected (explicitly or implicitly), it repaints in combat. If any is, it defers, and keeps existing headings only while the first moved frame is still where the last paint placed it. Blanket deferral was rejected because the host does not defer. Moving a protected frame in combat is never attempted.

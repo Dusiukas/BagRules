@@ -29,7 +29,8 @@ Early research identified EUI virtual-category integration as the viable extensi
 | 0.7.2 | Yes | Continuous smart icon browser |
 | 0.7.3 | Yes | Expanded icon taxonomy |
 | 0.7.4 | Yes; integrated baseline | Local icon filename database; generated index retained locally only |
-| 0.7.4-alpha.1 | Current | Combat hierarchy/sidebar preservation and delayed post-combat rebuild |
+| 0.7.4-alpha.1 | Superseded | Combat hierarchy/sidebar preservation and delayed post-combat rebuild; still went flat in combat in game |
+| 0.7.4-alpha.2 | Current | Repaint unprotected hierarchy/sidebar frames in combat; drop stale headings; post-combat repaint |
 | 0.7.5 | No | Transcript claims selectable parent categories |
 
 ## User feedback that shaped the project

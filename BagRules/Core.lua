@@ -1,7 +1,7 @@
 local ADDON, BR = ...
 local R=BR.Rules
 local F=BR.Filters
-BR.version="0.7.4-alpha.1"
+BR.version="0.7.4-alpha.2"
 local defaults={
     {name="Quest Items",expr="quest",icon=134400},
     {name="Recipes",expr="recipe",icon=134939},
@@ -580,6 +580,13 @@ events:SetScript("OnEvent",function(_,event,arg)
         local refresh=BR.pendingRefresh or (BR.status and (BR.status.native>0 or BR.status.runtime and BR.db and BR.db.sectionLayout=="hierarchy"))
         if BR.pending then BR:Apply() end
         if refresh then scheduleRefresh() end
+        -- Virtual-category refreshes need not repaint the open bag. If an adapter
+        -- is still deferred after the delayed refresh, repaint the bag once.
+        if C_Timer and C_Timer.After then C_Timer.After(0.4,function()
+            local rs,ns,bag=BR.RuntimeSections,BR.NativeSidebar,_G.EUI_Bags
+            if InCombatLockdown and InCombatLockdown() then return end
+            if ((rs and rs.deferred) or (ns and ns.deferred)) and bag and type(bag.RefreshInventory)=="function" and bag.IsVisible and bag:IsVisible() then pcall(bag.RefreshInventory,bag) end
+        end) end
     elseif BR.db and BR.db.enabled and (event=="BAG_UPDATE_DELAYED" or event=="GET_ITEM_INFO_RECEIVED" or event=="AUCTION_HOUSE_CLOSED" or event=="BANKFRAME_OPENED") then scheduleRefresh() end
 end)
 

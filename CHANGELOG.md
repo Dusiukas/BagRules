@@ -1,8 +1,15 @@
 # Changelog
 
-The repository now carries the reviewed 0.7.4 source plus the alpha.1 combat hotfix. Older entries document the recovered release lineage.
+The repository now carries the reviewed 0.7.4 source plus the alpha.1 and alpha.2 combat fixes. Older entries document the recovered release lineage.
 
-## 0.7.4-alpha.1 — current development source
+## 0.7.4-alpha.2 — current development source
+
+- Fixed bags still turning flat in combat on alpha.1. EUI rebuilds its flat layout when inventory changes in combat, so skipping BagRules' pass left the flat layout on screen. The runtime hierarchy and grouped native sidebar now repaint in combat when none of the frames they move is protected (`IsProtected()`).
+- If any affected frame is protected, the repaint is deferred. Existing headings are kept only while the layout under them is unchanged; stale headings are hidden instead of overlapping rebuilt rows.
+- After combat, the open bag is repainted once if an adapter is still deferred.
+- Owner-reported live test on 2026-11-20: the fix works in game. Detailed status output, taint log and bank/list/offline cases were not recorded.
+
+## 0.7.4-alpha.1
 
 - Updated the repository source from 0.4.0 to the complete recovered 0.7.4 codebase.
 - Preserved the last validated green parent headers and grouped sidebar layout during combat instead of immediately exposing flat per-category labels.

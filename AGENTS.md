@@ -5,7 +5,7 @@ This file is the primary instruction source for all coding agents working in thi
 ## Project and evidence state
 
 - BagRules is a WoW Forever inventory-classification addon for the EllesmereUI (EUI) ecosystem.
-- The active addon source is `0.7.4-alpha.1`: the recovered 0.7.4 codebase plus a combat hierarchy hotfix. The earlier Git baseline was 0.4.0-alpha.
+- The active addon source is `0.7.4-alpha.2`: the recovered 0.7.4 codebase plus combat hierarchy fixes. The earlier Git baseline was 0.4.0-alpha.
 - The generated 33,823-entry `IconFileIndex.lua` is retained only in the owner's local package. Public source uses an empty placeholder until redistribution permission is confirmed.
 - The historical conversation describes and links a `0.7.5-alpha` build with selectable parent categories. That attachment has not been recovered. Treat 0.7.5 behavior as a requirement and historical claim, not as available or verified source.
 - Private recovery material lives outside this public repository at `%USERPROFILE%\Desktop\BagRules-History`. It includes raw conversation transcripts, release ZIPs, manifests, and source snapshots.
@@ -38,7 +38,7 @@ When evidence conflicts, use this order: current source and Git history; recover
 ## Development workflow
 
 1. Check `git status` and preserve unrelated user changes.
-2. Identify whether a change targets the active 0.7.4-alpha.1 line, historical 0.4 behavior, or the planned post-recovery line.
+2. Identify whether a change targets the active 0.7.4-alpha.2 line, historical 0.4 behavior, or the planned post-recovery line.
 3. Update requirements and decisions when behavior changes.
 4. Add focused tests where possible. Historical claims are not test evidence.
 5. Run static checks and the manual WoW/EUI matrix in `docs/TESTING.md` in proportion to the change.
