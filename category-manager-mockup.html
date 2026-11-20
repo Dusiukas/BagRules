@@ -1,0 +1,768 @@
+<title>BagRules Category Manager</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: a static EllesmereUI window frame; inside it a two-pane manager (category list | editor) built from EUI's own flat option rows, with a mock bag underneath to drag items from. Single dark look on purpose: it mirrors the in-game UI. */
+:root{
+  color-scheme:dark;
+  --page:#06080a; --win:#0e1317; --side:#10161b; --head:#0a0e12;
+  --row-a:#141a1f; --row-b:#181f25; --ctl:#1e252b; --ctl-hi:#252d34; --line:#2b333a; --line-soft:#1f262c;
+  --text:#e9eef1; --dim:#8d989f; --faint:#5b666d;
+  --accent:#12c8f4; --accent-soft:rgba(18,200,244,.13); --accent-ink:#04222b;
+  --bronze:#4d3d2d; --warn:#e9b24c; --danger:#e2645d; --ok:#5ccb8d;
+  --font:"Barlow","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.45}
+.page{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+.intro h1{font-size:22px;font-weight:600;margin:0 0 4px;text-wrap:balance}
+.intro p{margin:0;color:var(--dim);max-width:72ch}
+.stage{overflow-x:auto;padding-bottom:6px}
+.stack{width:1130px;display:flex;flex-direction:column;gap:12px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- EUI window chrome (static) ---------- */
+.win{width:1128px;height:850px;display:grid;grid-template-columns:258px 1fr;background:var(--win);border:1px solid var(--bronze);box-shadow:0 0 0 1px #000,0 18px 50px rgba(0,0,0,.6)}
+.chrome{pointer-events:none;user-select:none}
+.side{background:var(--side);border-right:1px solid var(--bronze);display:flex;flex-direction:column;min-height:0}
+.logo{height:76px;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid var(--bronze);background:var(--head)}
+.logo b{width:38px;height:38px;border-radius:50%;border:2px solid #b98b4e;display:grid;place-items:center;color:var(--accent);font-size:18px;font-weight:600}
+.logo span{font-size:15px;font-weight:600;letter-spacing:.08em;line-height:1.1;color:#f0e6d6}
+.logo span i{display:block;font-style:normal;color:#e39a3c;font-size:17px}
+.nav{padding:14px 0 6px;display:flex;flex-direction:column}
+.nav div{display:flex;align-items:center;gap:14px;padding:8px 26px;color:#cfd6da;font-weight:500}
+.nav svg{color:var(--dim);width:20px;height:20px}
+.sfind{margin:4px 18px 10px;padding:6px 10px;border:1px solid var(--line);background:#0c1115;color:var(--faint);font-size:12px}
+.mods{flex:1;overflow:hidden;padding-bottom:8px}
+.mods h4{margin:12px 18px 4px;font-size:14px;font-weight:600;color:var(--accent)}
+.mods div{display:flex;align-items:center;gap:8px;padding:5px 18px 5px 32px;color:#c3cbd0}
+.mods div span{flex:1}
+.mods svg{width:13px;height:13px;color:var(--faint)}
+.mods div.cur{background:var(--ctl);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+.sfoot{padding:10px 18px;border-top:1px solid var(--line-soft);font-size:10px;color:var(--faint);display:flex;justify-content:space-between}
+.main{display:grid;grid-template-rows:104px 46px minmax(0,1fr) 62px;min-width:0;min-height:0}
+.head{background:linear-gradient(180deg,#0a0e12,#10171c);padding:24px 36px 0;border-bottom:1px solid var(--bronze);position:relative}
+.head h2{margin:0;font-size:29px;font-weight:600;letter-spacing:.01em}
+.head p{margin:2px 0 0;color:var(--dim);font-size:12.5px}
+.head .scale{position:absolute;right:28px;top:20px;display:flex;align-items:center;gap:10px;font-size:11px;color:#cfd6da}
+.head .scale u{width:92px;height:3px;background:linear-gradient(90deg,var(--accent) 45%,#39424a 45%);display:block}
+.head .scale em{width:30px;height:30px;border:1px solid var(--bronze);display:grid;place-items:center;font-style:normal}
+.tabs{display:flex;gap:30px;padding:0 42px;align-items:flex-end;border-bottom:1px solid var(--line-soft)}
+.tabs span{padding:0 0 9px;font-size:15px;font-weight:500;color:var(--dim)}
+.tabs span.on{color:#fff;box-shadow:inset 0 -2px 0 var(--accent)}
+.foot{border-top:1px solid var(--bronze);background:var(--head);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.foot span{border:1px solid var(--line);padding:7px 44px;color:#d5dbdf;font-size:13px}
+.foot span:last-child{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- Manager body ---------- */
+.body{display:grid;grid-template-columns:262px minmax(0,1fr);gap:20px;padding:18px 26px 16px 34px;min-height:0}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0}
+#editor{outline:1px dashed transparent;outline-offset:6px}
+#editor.drop{outline-color:var(--accent);background:var(--accent-soft)}
+.cap{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:0}
+.field,.sel{background:var(--ctl);border:1px solid var(--line);height:28px;padding:0 9px;min-width:0;width:100%;border-radius:0}
+.field::placeholder{color:var(--faint)}
+.sel{appearance:none;padding-right:24px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238d989f' stroke-width='1.4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;text-overflow:ellipsis}
+.sel:hover,.field:hover{border-color:#3b454d}
+.field:disabled{opacity:.4}
+.btn{height:28px;padding:0 14px;background:var(--ctl);border:1px solid var(--line);color:#d5dbdf;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--ctl-hi);color:#fff}
+.btn.ghost{background:none;border-color:transparent;color:var(--dim)}
+.btn.ghost:hover{color:#fff;background:var(--ctl)}
+.btn.pri{border-color:var(--accent);color:var(--accent)}
+.btn.pri:not(:disabled):hover{background:var(--accent);color:var(--accent-ink)}
+.btn.sm{height:22px;padding:0 9px;font-size:12px}
+.btn:disabled{opacity:.38;cursor:default}
+.btn.arm{border-color:var(--danger);color:var(--danger)}
+
+/* list */
+.ltools{display:flex;gap:6px;margin-bottom:8px}
+.search{position:relative;flex:1;min-width:0}
+.search svg{position:absolute;left:8px;top:6px;color:var(--faint)}
+.search .field{padding-left:30px}
+.list{flex:1;overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#333c43 transparent;padding-right:4px}
+.sec{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;border-bottom:1px solid var(--line-soft);padding:12px 6px 5px 2px;text-align:left}
+.sec:first-child{padding-top:2px}
+.sec svg{width:12px;height:12px;color:var(--faint);transition:transform .12s}
+.sec.shut svg{transform:rotate(-90deg)}
+.sec b{flex:1;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.sec:hover b{color:#fff}
+.sec small{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.cat{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;height:32px;padding:0 8px 0 6px;border:0;background:none;text-align:left;position:relative}
+.cat:nth-of-type(even){background:rgba(255,255,255,.018)}
+.cat:hover{background:var(--ctl)}
+.cat.on{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.cat.drop{background:var(--accent-soft);outline:1px solid var(--accent);outline-offset:-1px}
+.cat .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.cat.on .nm{color:#fff;font-weight:500}
+.cat.off .nm,.cat.off .tile{opacity:.45}
+.cat .n{font-variant-numeric:tabular-nums;font-size:12px;color:var(--text);min-width:18px;text-align:right}
+.cat .n.z{color:var(--faint)}
+.cat .tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.cat.inbox{margin-top:10px;border-top:1px solid var(--line-soft);height:36px}
+.cat.inbox .n{color:var(--warn)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--warn);flex:none}
+.wr{color:var(--warn);width:13px;height:13px}
+.tile{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.14);background:color-mix(in srgb,var(--t) 24%,#11171c);color:var(--t)}
+.tile svg{width:14px;height:14px}
+.tile.big{width:44px;height:44px;padding:0;cursor:pointer}
+.tile.big svg{width:26px;height:26px}
+.tile.big:hover{border-color:var(--accent)}
+.tile.q{--t:var(--dim);border-style:dashed}
+.empty{color:var(--faint);padding:18px 6px;font-size:13px}
+.lhint{font-size:11px;color:var(--faint);padding-top:8px;border-top:1px solid var(--line-soft);margin-top:6px}
+
+/* editor */
+.ehead{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center}
+.ehead h3{margin:0;font-size:21px;font-weight:600}
+.ename{background:none;border:0;border-bottom:1px solid transparent;font-size:21px;font-weight:600;width:100%;padding:0 0 1px;height:30px}
+.ename:hover{border-bottom-color:var(--line)}
+.ename:focus{outline:0;border-bottom-color:var(--accent)}
+.emeta{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;margin-top:2px}
+.emeta .sel{width:auto;height:22px;font-size:12px;background-color:transparent;border-color:transparent;padding-left:4px;color:var(--text)}
+.emeta .sel:hover{border-color:var(--line);background-color:var(--ctl)}
+.togw{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:12.5px}
+.tog{width:36px;height:18px;border-radius:9px;border:0;background:#3a434a;position:relative;padding:0;transition:background .12s}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#dfe5e8;transition:left .12s}
+.tog[aria-checked="true"]{background:var(--accent)}
+.tog[aria-checked="true"]::after{left:20px;background:#fff}
+.sub{display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid var(--line-soft);margin-top:14px}
+.sub button{background:none;border:0;padding:0 0 7px;color:var(--dim);font-weight:500;display:flex;align-items:center;gap:6px}
+.sub button:hover{color:#fff}
+.sub button[aria-selected="true"]{color:#fff;box-shadow:inset 0 -2px 0 var(--accent)}
+.seg{margin-left:auto;display:flex;margin-bottom:6px;border:1px solid var(--line)}
+.seg button{padding:2px 12px;font-size:12px;height:22px}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.escroll{flex:1;overflow-y:auto;min-height:0;padding:14px 4px 10px 0;display:flex;flex-direction:column;gap:16px;scrollbar-width:thin;scrollbar-color:#333c43 transparent}
+.blk{display:flex;flex-direction:column;gap:7px}
+.grp-head{display:flex;align-items:center;gap:7px;height:36px;padding:0 8px;background:var(--row-b);color:var(--dim)}
+.grp-head .sel{width:74px;color:var(--accent);font-weight:600;border-color:transparent;background-color:transparent}
+.grp-head .sel:hover{border-color:var(--line);background-color:var(--ctl)}
+.grp-head .sp{flex:1}
+.grp-body{margin-left:17px;padding-left:10px;border-left:1px solid var(--line)}
+.grp-body>.grp{margin:3px 0}
+.cond{display:grid;grid-template-columns:38px minmax(0,1.15fr) 104px minmax(0,1.15fr) 24px;gap:6px;align-items:center;height:36px;padding:0 8px;background:var(--row-a)}
+.cond:nth-child(even){background:var(--row-b)}
+.not{height:20px;width:38px;padding:0;font-size:10px;font-weight:600;letter-spacing:.06em;background:none;border:1px solid var(--line);color:var(--faint);flex:none}
+.not:hover{color:var(--text);border-color:#46515a}
+.not.on{background:rgba(226,100,93,.16);border-color:var(--danger);color:#ff8f88}
+.x{width:24px;height:24px;display:grid;place-items:center;background:none;border:0;color:var(--faint);padding:0;flex:none}
+.x:hover{color:var(--danger)}
+.x svg{width:12px;height:12px}
+.adds{display:flex;gap:4px;padding:4px 0 2px}
+.adds .btn{height:24px;padding:0 9px;font-size:12px}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#9fd9ea;background:#0b1014;border:1px solid var(--line-soft);padding:8px 10px;overflow-wrap:anywhere}
+.code.lg{min-height:120px;font-size:13px;line-height:1.6}
+.hint{font-size:12px;color:var(--faint)}
+.psum{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--dim)}
+.psum b{color:#fff;font-weight:600}
+.psum .w{color:var(--warn)}
+.conf{display:flex;align-items:center;gap:10px;font-size:12.5px;color:#f0cf8e;background:rgba(233,178,76,.07);border:1px solid rgba(233,178,76,.3);padding:5px 6px 5px 10px}
+.conf span{flex:1}
+.items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.item{display:flex;align-items:center;gap:8px;background:var(--row-a);padding:4px 8px;font-size:12.5px;min-width:0;border:0;text-align:left}
+button.item:hover{background:var(--ctl-hi)}
+.item .nmq{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--q);flex:1}
+.item em{font-style:normal;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.item.lost{opacity:.55}
+.it{width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--q);background:color-mix(in srgb,var(--q) 16%,#11171c);color:var(--q);flex:none;position:relative}
+.it svg{width:14px;height:14px}
+.orow{display:grid;grid-template-columns:190px minmax(0,1fr);gap:14px;align-items:center;min-height:44px;padding:6px 14px;background:var(--row-a)}
+.orow:nth-child(even){background:var(--row-b)}
+.orow label,.orow .lab{font-weight:500}
+.orow small{display:block;color:var(--faint);font-size:11.5px;font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--ctl);border:1px solid var(--line);padding:1px 2px 1px 8px;font-size:12.5px;color:var(--q)}
+.icons{display:flex;flex-wrap:wrap;gap:6px}
+.icons .tile{width:32px;height:32px;padding:0;cursor:pointer}
+.icons .tile svg{width:18px;height:18px}
+.icons .tile[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.warnbox{border:1px solid rgba(233,178,76,.4);background:rgba(233,178,76,.07);color:#f0cf8e;padding:9px 12px;font-size:12.5px;display:flex;gap:9px}
+.warnbox svg{color:var(--warn);margin-top:2px}
+.abar{display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.status{flex:1;font-size:12.5px;color:var(--dim);display:flex;align-items:center;gap:7px;min-width:0}
+.status.dirty{color:var(--warn)}
+
+.pick{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.pick .sel{width:auto;max-width:230px}
+.pick .chip{--q:var(--text)}
+.two{display:flex;gap:8px;align-items:center;color:var(--dim)}
+.two .sel{max-width:170px}
+.say{border-left:2px solid var(--accent);background:var(--row-a);padding:9px 14px;font-size:14px}
+.say small{display:block;color:var(--dim);font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;margin-bottom:2px}
+/* from-item, gallery, inbox */
+.callout{border:1px dashed #3b5560;background:var(--accent-soft);padding:10px 14px;color:#bfeaf6;font-size:13px}
+.chk{display:grid;grid-template-columns:20px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;min-height:38px;padding:4px 14px;background:var(--row-a)}
+.chk:nth-child(even){background:var(--row-b)}
+.chk input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);margin:0}
+.chk b{font-weight:500}
+.chk span{color:var(--dim)}
+.chk.dis{opacity:.4}
+.gal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.card{display:grid;grid-template-columns:22px minmax(0,1fr);gap:2px 10px;align-items:center;background:var(--row-a);border:1px solid transparent;padding:9px 12px;text-align:left}
+.card:hover{border-color:var(--accent);background:var(--row-b)}
+.card b{font-weight:500}
+.card small{grid-column:2;color:var(--dim);font-size:12px}
+.card small.has{color:var(--ok)}
+.pinrow{display:flex;gap:6px;align-items:center}
+.pinrow .sel{max-width:220px}
+
+/* mock bag */
+.bag{border:1px solid var(--bronze);background:var(--win);padding:12px 16px 14px;display:flex;flex-direction:column;gap:9px}
+.bag header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.bag h3{margin:0;font-size:15px;font-weight:600}
+.bag header span{color:var(--dim);font-size:12.5px}
+.slots{display:flex;flex-wrap:wrap;gap:5px}
+.slot{width:40px;height:40px;padding:0;border:1px solid var(--q);background:color-mix(in srgb,var(--q) 14%,#11171c);color:var(--q);display:grid;place-items:center;position:relative;cursor:grab}
+.slot svg{width:22px;height:22px}
+.slot b{position:absolute;right:2px;bottom:0;font-size:11px;font-weight:600;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000}
+.slot:hover{box-shadow:0 0 0 1px var(--accent)}
+.slot.none{outline:1px dashed var(--warn);outline-offset:1px}
+.why{font-size:12.5px;color:var(--dim);min-height:18px}
+.why b{color:var(--text);font-weight:500}
+
+/* notes */
+.notes h2{font-size:15px;font-weight:600;margin:0 0 10px}
+.notes ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 28px}
+.notes li{color:var(--dim);border-top:1px solid var(--line-soft);padding-top:9px}
+.notes li b{display:block;color:var(--text);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<svg hidden>
+  <symbol id="g-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></symbol>
+  <symbol id="g-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="g-x" viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></symbol>
+  <symbol id="g-warn" viewBox="0 0 16 16"><path d="M8 2l6.5 11.5h-13zM8 6.5v3.5M8 12h.01"/></symbol>
+  <symbol id="g-refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 11-1.5-3.5M13 2v3h-3"/></symbol>
+  <symbol id="g-power" viewBox="0 0 16 16"><path d="M8 2v6M4.5 4.5a5 5 0 107 0"/></symbol>
+  <symbol id="g-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M5 8h6"/></symbol>
+  <symbol id="g-q" viewBox="0 0 16 16"><path d="M5.500 6a2.500 2.500 0 115 0c0 1.500-2.500 2-2.500 3.500M8 12.500h.01"/></symbol>
+  <symbol id="g-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="c-sword" viewBox="0 0 16 16"><path d="M3 13l9-9M12 4l1.5-1.5M5 8l3 3"/></symbol>
+  <symbol id="c-shield" viewBox="0 0 16 16"><path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z"/></symbol>
+  <symbol id="c-ring" viewBox="0 0 16 16"><circle cx="8" cy="9.5" r="4"/><path d="M6.5 2.5h3L8 5.5z"/></symbol>
+  <symbol id="c-chest" viewBox="0 0 16 16"><path d="M4 3l2 1h4l2-1 2 3-2 1v6H4V7L2 6z"/></symbol>
+  <symbol id="c-flask" viewBox="0 0 16 16"><path d="M6 2h4M7 2v4l-3 6a1 1 0 001 2h6a1 1 0 001-2L9 6V2"/></symbol>
+  <symbol id="c-food" viewBox="0 0 16 16"><path d="M3 9a5 5 0 0110 0zM2 11h12M4 13.5h8"/></symbol>
+  <symbol id="c-cross" viewBox="0 0 16 16"><path d="M6 2h4v4h4v4h-4v4H6v-4H2V6h4z"/></symbol>
+  <symbol id="c-home" viewBox="0 0 16 16"><path d="M2 8l6-5 6 5M4 7v6h8V7"/></symbol>
+  <symbol id="c-portal" viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="4" ry="6"/><ellipse cx="8" cy="8" rx="1.5" ry="3"/></symbol>
+  <symbol id="c-mount" viewBox="0 0 16 16"><path d="M4 13V7a4 4 0 018 0v6M2.5 13h3M10.5 13h3"/></symbol>
+  <symbol id="c-paw" viewBox="0 0 16 16"><path d="M8 8.5c2 0 3.5 1.8 3.5 3.2S10 13.5 8 13.5s-3.500-.4-3.500-1.800S6 8.500 8 8.500z"/><path d="M4 7h.01M6.500 4.500h.01M9.500 4.500h.01M12 7h.01" stroke-width="2.200"/></symbol>
+  <symbol id="c-bag" viewBox="0 0 16 16"><path d="M5 5V4a3 3 0 016 0v1M3 5h10l-1 9H4z"/></symbol>
+  <symbol id="c-box" viewBox="0 0 16 16"><path d="M2 5l6-3 6 3v6l-6 3-6-3zM2 5l6 3 6-3M8 8v6"/></symbol>
+  <symbol id="c-shirt" viewBox="0 0 16 16"><path d="M5 2l3 2 3-2 3 3-2 2v7H4V7L2 5z"/></symbol>
+  <symbol id="c-leaf" viewBox="0 0 16 16"><path d="M3 13c0-6 4-10 10-10 0 6-4 10-10 10zM3 13l6-6"/></symbol>
+  <symbol id="c-scroll" viewBox="0 0 16 16"><path d="M4 2h8v12H4zM6.500 5.500h3M6.500 8h3M6.500 10.500h2"/></symbol>
+</svg>
+
+<div class="page">
+  <header class="intro">
+    <h1>BagRules Category Manager: start from an item</h1>
+    <p>A working mockup. Drag an item from the bag below onto the manager to build a category from it, or onto a category row to pin it there (clicking an item works too). Counts and previews are calculated live from the rules. The EUI frame is static and the bag contents are example data.</p>
+  </header>
+
+  <div class="stage"><div class="stack">
+    <div class="win">
+      <aside class="side chrome" aria-hidden="true">
+        <div class="logo"><b>E</b><span>ELLESMEREUI<i>FOREVER</i></span></div>
+        <div class="nav">
+          <div><svg class="i"><use href="#g-dot"/></svg>Unlock Mode</div>
+          <div><svg class="i"><use href="#g-refresh"/></svg>Global Settings</div>
+          <div><svg class="i"><use href="#c-box"/></svg>Profiles &amp; Presets</div>
+        </div>
+        <div class="sfind">Search Features…</div>
+        <div class="mods">
+          <h4>Utility Addons</h4>
+          <div><span>Quality of Life</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Forever Essentials</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>DataBars</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Quickdraw</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <h4>UI Enhancements</h4>
+          <div><span>Blizzard Skins</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Chat</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Bags</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Quest Tracker</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <div><span>Minimap</span><svg class="i"><use href="#g-refresh"/></svg><svg class="i"><use href="#g-power"/></svg></div>
+          <h4>BagRules</h4>
+          <div class="cur"><span>Category Manager</span></div>
+        </div>
+        <div class="sfoot"><span>v9.9.1</span><span>All EUI Addons</span></div>
+      </aside>
+
+      <div class="main">
+        <div class="head chrome" aria-hidden="true">
+          <h2>Category Manager</h2>
+          <p>Organise inventory categories and build visual rules.</p>
+          <div class="scale">Window Scale <u></u> 130% <em>↙</em><em>✕</em></div>
+        </div>
+        <div class="tabs chrome" aria-hidden="true"><span class="on">Categories</span><span>General</span><span>Import / Export</span></div>
+
+        <div class="body" id="body">
+          <section class="pane" aria-label="Categories">
+            <div class="ltools">
+              <div class="search"><svg class="i"><use href="#g-search"/></svg><input class="field" id="q" type="search" placeholder="Find category…" aria-label="Find category"></div>
+              <button class="btn" id="new" type="button">+ New</button>
+            </div>
+            <div class="list" id="list"></div>
+            <div class="lhint">Drop a bag item on a row to pin it there. Drag rows to reorder.</div>
+          </section>
+
+          <section class="pane" id="editor" aria-label="Category editor"></section>
+        </div>
+
+        <div class="foot chrome" aria-hidden="true"><span>Reload UI</span><span>Close</span></div>
+      </div>
+    </div>
+
+    <section class="bag" aria-label="Example bag">
+      <header><h3>Your bags</h3><span>Drag an item onto the manager above, or click it. A dashed outline means no category catches it yet.</span></header>
+      <div class="slots" id="bag"></div>
+      <div class="why" id="why">Hover an item to see which category caught it.</div>
+    </section>
+  </div></div>
+
+  <section class="notes">
+    <h2>What this flow changes</h2>
+    <ul>
+      <li><b>Simple filters, no logic words</b>The default rule editor is one row per item property (kind, quality, binding, slot, name), each a dropdown. A plain sentence above says what the category catches. The and/or/not builder moves to Advanced for those who want it.</li>
+      <li><b>Create from an item</b>Drop an item on the manager and the new category is pre-filled from it: type, subtype, quality and name as tick boxes, with the matching bag items shown before you create anything.</li>
+      <li><b>Pin by dropping</b>Drop an item on a category row to pin it there. Pinned items show as removable chips under Advanced, replacing the typed item-ID box.</li>
+      <li><b>Template gallery</b>"+ New" opens ready-made categories with a live count of what each would catch in your bags. One click adds it, already enabled.</li>
+      <li><b>Names, not IDs</b>Conditions say "Item type is Consumable" and "Item subtype is Trade Goods: Cloth" instead of class 0 and subclass 5.</li>
+      <li><b>Conflicts you can see and fix</b>Priority is Low to Highest instead of a number. When another category takes an item, the preview says which one and offers "Make this one win". Try it on Weapons.</li>
+      <li><b>Uncategorised inbox and "why is this here"</b>The list ends with the items no rule catches, each one click away from a new category. Hovering a bag item names the category that caught it.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ic=(n,cls='i')=>`<svg class="${cls}"><use href="#${n}"/></svg>`;
+const $=id=>document.getElementById(id);
+const QUAL=['Poor','Common','Uncommon','Rare','Epic','Legendary'];
+const QCOL=['#9d9d9d','#e9eef1','#3fdc2c','#3d8ef0','#b455f0','#ff8000'];
+const PRIO=['Low','Normal','High','Higher','Highest'];
+const TYPES=['Consumable','Trade Goods','Weapon','Armor','Container','Recipe','Quest','Miscellaneous'];
+const SUBS=['Consumable: Potion','Consumable: Food & Drink','Consumable: Bandage','Consumable: Elixir','Consumable: Scroll','Trade Goods: Cloth','Trade Goods: Herb','Trade Goods: Leather','Trade Goods: Metal & Stone','Weapon: Sword','Weapon: Bow','Armor: Cloth','Armor: Leather','Armor: Mail','Recipe: Tailoring','Quest: Quest','Miscellaneous: Junk','Miscellaneous: Mount','Miscellaneous: Companion Pet','Miscellaneous: Other'];
+const SLOTS=['Finger','Neck','Trinket','Tabard','Shirt','Head','Chest','Main Hand','Ranged'];
+const FIELDS=[['name','Item name','text'],['type','Item type','type'],['sub','Item subtype','sub'],['q','Item quality','quality'],['quest','Quest item','bool'],['boe','Bind on equip','bool'],['bound','Soulbound','bool'],['itemset','In an equipment set','bool'],['openable','Openable','bool'],['slot','Equipment slot','slot'],['id','Item ID','num'],['ilvl','Item level','num'],['n','Stack count','num'],['constant','Special match','constant']];
+const OPN={'=':'is','!=':'is not','~':'contains','>=':'at least','<=':'at most','>':'more than','<':'less than'};
+const kind=f=>(FIELDS.find(x=>x[0]===f)||[])[2];
+const ops=k=>k==='constant'?['=']:k==='text'?['~','=','!=']:k==='quality'||k==='num'?['=','!=','>=','<=','>','<']:['=','!='];
+const choices=k=>({bool:['Yes','No'],quality:QUAL,constant:['Never','All','Unknown'],type:TYPES,sub:SUBS,slot:SLOTS})[k];
+const C=(f,op,v,neg)=>({k:'c',f,op,v,neg:!!neg});
+const G=(mode,c,neg)=>({k:'g',mode,c,neg:!!neg});
+const ICONS=['c-sword','c-shield','c-ring','c-chest','c-flask','c-food','c-cross','c-home','c-portal','c-mount','c-paw','c-bag','c-box','c-shirt','c-leaf','c-scroll'];
+const TINTS=['#e2a35a','#6fb7ff','#f1d36b','#b9c4cc','#ef6f9a','#f0a04b','#f2f2f2','#6fd6ff','#b48cff','#c9a06e','#8fd68a','#d9b27a','#a0aab2','#e98bd0','#7fd38a','#e6d5a8'];
+
+/* example bag */
+const I=(id,name,type,sub,q,n,x={})=>({id,name,type,sub,q,n,quest:false,boe:false,bound:false,openable:false,slot:'',ilvl:1,...x});
+const BAG=[
+ I(118,'Minor Healing Potion','Consumable','Potion',1,5),I(3385,'Lesser Mana Potion','Consumable','Potion',1,3),
+ I(117,'Tough Jerky','Consumable','Food & Drink',1,12),I(159,'Refreshing Spring Water','Consumable','Food & Drink',1,20),I(2287,'Haunch of Meat','Consumable','Food & Drink',1,8),I(414,'Dalaran Sharp','Consumable','Food & Drink',1,4),I(4536,'Shiny Red Apple','Consumable','Food & Drink',1,6),I(1179,'Ice Cold Milk','Consumable','Food & Drink',1,10),I(4541,'Freshly Baked Bread','Consumable','Food & Drink',1,5),I(4592,'Longjaw Mud Snapper','Consumable','Food & Drink',1,7),I(4542,'Moist Cornbread','Consumable','Food & Drink',1,3),
+ I(2581,'Heavy Linen Bandage','Consumable','Bandage',1,14),I(6948,'Hearthstone','Miscellaneous','Other',1,1,{bound:true}),
+ I(90001,'Feral Blade of the Monkey','Weapon','Sword',2,1,{boe:true,slot:'Main Hand',ilvl:22}),I(90002,'Cadet Vest','Armor','Mail',1,1,{slot:'Chest',ilvl:10}),
+ I(2589,'Linen Cloth','Trade Goods','Cloth',1,20),I(2592,'Wool Cloth','Trade Goods','Cloth',1,12),I(2447,'Peacebloom','Trade Goods','Herb',1,9),I(765,'Silverleaf','Trade Goods','Herb',1,6),I(2770,'Copper Ore','Trade Goods','Metal & Stone',1,14),I(2318,'Light Leather','Trade Goods','Leather',1,8),
+ I(2598,'Pattern: Red Linen Robe','Recipe','Tailoring',2,1),I(90003,'Tattered Letter','Quest','Quest',1,1,{quest:true,bound:true}),I(7073,'Broken Fang','Miscellaneous','Junk',0,4),
+];
+const item=id=>BAG.find(i=>i.id===+id);
+const iicon=it=>({Potion:'c-flask','Food & Drink':'c-food',Bandage:'c-cross',Sword:'c-sword',Mail:'c-chest',Cloth:'c-shirt',Herb:'c-leaf','Metal & Stone':'c-box',Leather:'c-bag',Tailoring:'c-scroll',Quest:'c-scroll',Junk:'c-paw',Other:'c-home'})[it.sub]||'c-box';
+const itile=it=>`<span class="it" style="--q:${QCOL[it.q]}">${ic(iicon(it))}</span>`;
+
+/* rule evaluation: true / false / null (unknown), same three-valued logic as the addon */
+const cmp=(x,op,y)=>op==='='?x===y:op==='!='?x!==y:op==='>='?x>=y:op==='<='?x<=y:op==='>'?x>y:x<y;
+function ev(n,it){
+  let r;
+  if(n.k==='g'){const a=n.c.map(x=>ev(x,it));
+    r=!a.length?false:n.mode==='ALL'?(a.includes(false)?false:a.includes(null)?null:true):(a.includes(true)?true:a.includes(null)?null:false);
+  }else{const k=kind(n.f),v=n.v,x=it[n.f];
+    if(k==='constant') r=v==='All'?true:v==='Never'?false:null;
+    else if(k==='sub') r=((it.type+': '+it.sub)===v)===(n.op==='=');
+    else if(x===undefined) r=null;
+    else if(k==='bool') r=(x===(v==='Yes'))===(n.op==='=');
+    else if(k==='quality') r=cmp(x,n.op,QUAL.indexOf(v));
+    else if(k==='num') r=cmp(x,n.op,parseFloat(v)||0);
+    else if(!v) r=false;
+    else{const a=String(x).toLowerCase(),b=String(v).toLowerCase();r=n.op==='~'?a.includes(b):(a===b)===(n.op==='=')}
+  }
+  return r===null?null:(n.neg?!r:r);
+}
+function expr(n,top){
+  let s;
+  if(n.k==='g'){
+    if(!n.c.length) return 'never';
+    const a=n.c.map(x=>expr(x)),j=n.mode==='ALL'?' & ':' | ';
+    s=a.length===1?a[0]:(top&&!n.neg?a.join(j):'('+a.join(j)+')');
+  }else{const k=kind(n.f);
+    if(k==='constant') s=String(n.v).toLowerCase();
+    else if(k==='bool') s=((n.v==='Yes')===(n.op==='='))?n.f:'!'+n.f;
+    else if(k==='quality') s=`quality ${n.op} ${String(n.v).toLowerCase()}`;
+    else if(k==='num') s=`${n.f==='n'?'count':n.f==='ilvl'?'itemlevel':n.f} ${n.op} ${n.v||0}`;
+    else if(k==='sub') s=`subtype ${n.op} "${String(n.v).split(': ')[1]}"`;
+    else s=`${n.f} ${n.op} "${n.v}"`;
+  }
+  if(n.neg) s=/^[\w]+$|^\(.*\)$/.test(s)?'!'+s:'!('+s+')';
+  return s;
+}
+
+/* categories */
+let SECTIONS=['Equipment','Consumable','Utility & Hearthstones','Materials'];
+let uid=0;
+const mk=(sec,name,icon,rule,x={})=>({id:++uid,sec,name,icon,rule,on:true,prio:1,manual:[],warn:'',...x});
+let CATS=[
+ mk(0,'Gear Sets',1,G('ALL',[G('ANY',[C('itemset','=','Yes'),C('constant','=','Unknown'),C('name','~','token')]),C('type','=','Consumable',1),C('quest','=','Yes',1)]),{warn:'Equipment-set membership could not be translated from the imported Baganator rule. It evaluates as Unknown on this client.'}),
+ mk(0,'BoE',2,G('ALL',[C('boe','=','Yes'),C('bound','=','No'),C('q','>=','Uncommon')])),
+ mk(0,'Weapons',0,G('ALL',[C('type','=','Weapon')])),
+ mk(0,'Jewelry / Rings',2,G('ALL',[C('type','=','Armor'),G('ANY',[C('slot','=','Finger'),C('slot','=','Neck'),C('slot','=','Trinket')])])),
+ mk(0,'Armor',3,G('ALL',[C('type','=','Armor')])),
+ mk(1,'Potions',4,G('ALL',[C('sub','=','Consumable: Potion')])),
+ mk(1,'Food & Drink',5,G('ALL',[C('sub','=','Consumable: Food & Drink')])),
+ mk(1,'Bandages & First Aid',6,G('ALL',[C('sub','=','Consumable: Bandage')])),
+ mk(2,'Hearthstone',7,G('ANY',[C('id','=','6948'),C('name','~','Hearthstone')]),{prio:2}),
+ mk(2,'Teleports',8,G('ANY',[C('name','~','Scroll of Recall'),C('name','~','Rune of')])),
+ mk(2,'Mounts',9,G('ALL',[C('sub','=','Miscellaneous: Mount')])),
+ mk(2,'Pets',10,G('ALL',[C('sub','=','Miscellaneous: Companion Pet')]),{on:false}),
+ mk(2,'Containers',11,G('ALL',[C('type','=','Container')])),
+ mk(2,'Tabards / Shirts',13,G('ANY',[C('slot','=','Tabard'),C('slot','=','Shirt')])),
+];
+const TPL=[
+ ['Cloth',13,G('ALL',[C('sub','=','Trade Goods: Cloth')])],['Herbs',14,G('ALL',[C('sub','=','Trade Goods: Herb')])],['Leather',11,G('ALL',[C('sub','=','Trade Goods: Leather')])],
+ ['Ore & Stone',12,G('ALL',[C('sub','=','Trade Goods: Metal & Stone')])],['Crafting materials',12,G('ALL',[C('type','=','Trade Goods')])],['Recipes',15,G('ALL',[C('type','=','Recipe')])],
+ ['Quest items',8,G('ALL',[C('quest','=','Yes')])],['Poor quality',10,G('ALL',[C('q','=','Poor')])],['Consumables',4,G('ALL',[C('type','=','Consumable')])],
+];
+/* simple filters: one row per item property. Rows combine as "and", several values in one row as "or". Compiles to the same rule tree. */
+const SIMPLE0={kinds:[],qmin:0,qmax:5,bind:'any',slots:[],words:'',quest:'any',except:[]};
+const sm=o=>JSON.parse(JSON.stringify({...SIMPLE0,...o}));
+const hasFilter=s=>!!(s.kinds.length||s.qmin>0||s.qmax<5||s.bind!=='any'||s.slots.length||s.words.trim()||s.quest!=='any');
+function compile(s){
+  const c=[],any=a=>a.length===1?a[0]:G('ANY',a);
+  if(!hasFilter(s)) return G('ALL',[C('constant','=','Never')]);
+  if(s.kinds.length) c.push(any(s.kinds.map(k=>k.includes(': ')?C('sub','=',k):C('type','=',k))));
+  if(s.qmin===s.qmax) c.push(C('q','=',QUAL[s.qmin]));
+  else{if(s.qmin>0) c.push(C('q','>=',QUAL[s.qmin]));if(s.qmax<5) c.push(C('q','<=',QUAL[s.qmax]))}
+  if(s.bind==='bound') c.push(C('bound','=','Yes'));
+  if(s.bind==='unbound') c.push(C('bound','=','No'));
+  if(s.bind==='boe'){c.push(C('boe','=','Yes'));c.push(C('bound','=','No'))}
+  if(s.slots.length) c.push(any(s.slots.map(x=>C('slot','=',x))));
+  const w=s.words.split(',').map(x=>x.trim()).filter(Boolean);
+  if(w.length) c.push(any(w.map(x=>C('name','~',x))));
+  if(s.quest==='only') c.push(C('quest','=','Yes'));
+  if(s.quest==='no') c.push(C('quest','=','No'));
+  s.except.forEach(id=>c.push(C('id','=',String(id),1)));
+  return G('ALL',c);
+}
+const kindLabel=k=>k.includes(': ')?k.replace(': ',' › '):'All '+k;
+function say(s){
+  if(!hasFilter(s)) return 'Nothing yet. Choose at least one filter below.';
+  const p=[s.kinds.length?s.kinds.map(kindLabel).join(' or '):'Any item'];
+  if(s.qmin===s.qmax) p.push(QUAL[s.qmin]+' quality only');
+  else if(s.qmin>0&&s.qmax<5) p.push(QUAL[s.qmin]+' to '+QUAL[s.qmax]+' quality');
+  else if(s.qmin>0) p.push(QUAL[s.qmin]+' quality or better');
+  else if(s.qmax<5) p.push(QUAL[s.qmax]+' quality or lower');
+  if(s.bind!=='any') p.push({bound:'soulbound',unbound:'not soulbound',boe:'bind on equip and not yet bound'}[s.bind]);
+  if(s.slots.length) p.push('worn as '+s.slots.join(' or '));
+  const w=s.words.split(',').map(x=>x.trim()).filter(Boolean);
+  if(w.length) p.push('with '+w.map(x=>'"'+x+'"').join(' or ')+' in the name');
+  if(s.quest!=='any') p.push(s.quest==='only'?'quest items only':'no quest items');
+  if(s.except.length) p.push('except '+s.except.length+(s.except.length===1?' item':' items')+' you kept out');
+  return p.join(', ')+'.';
+}
+const SIMPLE={'BoE':{bind:'boe',qmin:2},'Weapons':{kinds:['Weapon']},'Jewelry / Rings':{kinds:['Armor'],slots:['Finger','Neck','Trinket']},'Armor':{kinds:['Armor']},'Potions':{kinds:['Consumable: Potion']},'Food & Drink':{kinds:['Consumable: Food & Drink']},'Bandages & First Aid':{kinds:['Consumable: Bandage']},'Hearthstone':{words:'Hearthstone'},'Teleports':{words:'Scroll of Recall, Rune of'},'Mounts':{kinds:['Miscellaneous: Mount']},'Pets':{kinds:['Miscellaneous: Companion Pet']},'Containers':{kinds:['Container']},'Tabards / Shirts':{slots:['Tabard','Shirt']}};
+CATS.forEach(c=>{const s=SIMPLE[c.name];c.simple=s?sm(s):null;if(s)c.rule=compile(c.simple)});
+const TSIMPLE={'Cloth':{kinds:['Trade Goods: Cloth']},'Herbs':{kinds:['Trade Goods: Herb']},'Leather':{kinds:['Trade Goods: Leather']},'Ore & Stone':{kinds:['Trade Goods: Metal & Stone']},'Crafting materials':{kinds:['Trade Goods']},'Recipes':{kinds:['Recipe']},'Quest items':{quest:'only'},'Poor quality':{qmin:0,qmax:0},'Consumables':{kinds:['Consumable']}};
+TPL.forEach(t=>{t[2]=TSIMPLE[t[0]]});
+function simpleHtml(c){
+  const s=c.simple, opt=(list,curv)=>list.map((o,i)=>`<option value="${i}"${i===curv?' selected':''}>${o}</option>`).join('');
+  const chip=(label,attr)=>`<span class="chip">${esc(label)}<button type="button" class="x" ${attr} aria-label="Remove ${esc(label)}">${ic('g-x','i')}</button></span>`;
+  const kinds=TYPES.map(t=>{const subs=SUBS.filter(x=>x.startsWith(t+': ')),n=BAG.filter(it=>it.type===t).length;
+    return `<optgroup label="${esc(t)}"><option value="${esc(t)}">All ${esc(t)}${n?' ('+n+' in bags)':''}</option>${subs.map(x=>{const m=BAG.filter(it=>it.type+': '+it.sub===x).length;return `<option value="${esc(x)}">${esc(x.split(': ')[1])}${m?' ('+m+' in bags)':''}</option>`}).join('')}</optgroup>`}).join('');
+  const sel=(id,key,pairs,curv)=>`<select class="sel" id="${id}" data-s="${key}" style="max-width:280px">${pairs.map(p=>`<option value="${p[0]}"${p[0]===curv?' selected':''}>${p[1]}</option>`).join('')}</select>`;
+  return `<div class="say"><small>This category catches</small>${esc(say(s))}</div>
+  <div>
+    <div class="orow"><div class="lab">Kind of item<small>Pick one or several.</small></div><div class="pick">${s.kinds.map((k,i)=>chip(kindLabel(k),`data-skind="${i}"`)).join('')}<select class="sel" id="s_kind" data-s="kindadd" aria-label="Add a kind of item"><option value="">${s.kinds.length?'Add another…':'Any kind. Choose…'}</option>${kinds}</select></div></div>
+    <div class="orow"><div class="lab">Quality</div><div class="two"><span>from</span><select class="sel" id="s_qmin" data-s="qmin" aria-label="Lowest quality">${opt(QUAL,s.qmin)}</select><span>to</span><select class="sel" id="s_qmax" data-s="qmax" aria-label="Highest quality">${opt(QUAL,s.qmax)}</select></div></div>
+    <div class="orow"><label for="s_bind">Binding</label>${sel('s_bind','bind',[['any',"Doesn't matter"],['bound','Soulbound'],['unbound','Not soulbound'],['boe','Bind on equip, not yet bound']],s.bind)}</div>
+    <div class="orow"><div class="lab">Worn as<small>For equipment only.</small></div><div class="pick">${s.slots.map((k,i)=>chip(k,`data-sslot="${i}"`)).join('')}<select class="sel" id="s_slot" data-s="slotadd" aria-label="Add an equipment slot"><option value="">${s.slots.length?'Add another…':'Any slot. Choose…'}</option>${SLOTS.filter(x=>!s.slots.includes(x)).map(x=>`<option>${x}</option>`).join('')}</select></div></div>
+    <div class="orow"><label for="s_words">Name contains<small>Separate several words with commas.</small></label><input class="field" id="s_words" data-s="words" value="${esc(s.words)}" placeholder="e.g. Potion, Elixir"></div>
+    <div class="orow"><label for="s_quest">Quest items</label>${sel('s_quest','quest',[['any',"Doesn't matter"],['only','Only quest items'],['no','No quest items']],s.quest)}</div>
+    <div class="orow"><div class="lab">Kept out<small>Click × on an item in the preview to keep it out.</small></div><div class="pick">${s.except.length?s.except.map((id,i)=>chip(item(id).name,`data-sexc="${i}"`)).join(''):'<span class="hint">Nothing kept out.</span>'}</div></div>
+  </div>`;
+}
+const snap=c=>JSON.stringify([c.name,c.on,c.sec,c.prio,c.manual,c.icon,c.rule,c.simple]);
+CATS.forEach(c=>c.saved=snap(c));
+const dirty=c=>snap(c)!==c.saved;
+const S={view:'cat',sel:CATS[5].id,tab:'rules',mode:'simple',shut:{},q:'',arm:false,msg:'',fi:null};
+const cur=()=>CATS.find(c=>c.id===S.sel);
+const tile=(c,cls='')=>`<span class="tile ${cls}" style="--t:${TINTS[c.icon]}">${ic(ICONS[c.icon],'i')}</span>`;
+const node=p=>p===''?cur().rule:p.split('.').reduce((n,i)=>n.c[+i],cur().rule);
+const hits=(c,it)=>c.manual.includes(it.id)||ev(c.rule,it)===true;
+
+/* pins win first, then higher priority, then list order */
+let CL=new Map();
+function classify(){
+  const act=CATS.filter(c=>c.on),ord=[...act].sort((a,b)=>b.prio-a.prio||CATS.indexOf(a)-CATS.indexOf(b));
+  CL=new Map(BAG.map(it=>{const w=act.find(c=>c.manual.includes(it.id))||ord.find(c=>ev(c.rule,it)===true);return [it.id,w?w.id:0]}));
+}
+const count=c=>BAG.filter(it=>CL.get(it.id)===c.id).length;
+const loose=()=>BAG.filter(it=>!CL.get(it.id));
+const where=it=>{const c=CATS.find(x=>x.id===CL.get(it.id));return c?`${SECTIONS[c.sec]} › ${c.name}`:''};
+
+function nodeHtml(n,p){
+  const id='r'+p.replace(/\./g,'_');
+  const not=`<button type="button" class="not${n.neg?' on':''}" data-act="neg" data-path="${p}" aria-pressed="${n.neg}" title="Negate this ${n.k==='g'?'group':'condition'}">NOT</button>`;
+  const rm=`<button type="button" class="x" data-act="rm" data-path="${p}" aria-label="Remove">${ic('g-x','i')}</button>`;
+  if(n.k==='g'){
+    const kids=n.c.map((x,i)=>nodeHtml(x,p===''?''+i:p+'.'+i)).join('');
+    return `<div class="grp"><div class="grp-head">${not}<span>Match</span>
+      <select class="sel" id="${id}_mode" data-prop="mode" data-path="${p}" aria-label="Group mode"><option value="ALL"${n.mode==='ALL'?' selected':''}>all</option><option value="ANY"${n.mode==='ANY'?' selected':''}>any</option></select>
+      <span>of these</span><span class="sp"></span>${p===''?'':rm}</div>
+      <div class="grp-body">${kids}<div class="adds"><button type="button" class="btn ghost" data-act="addc" data-path="${p}">+ Condition</button><button type="button" class="btn ghost" data-act="addg" data-path="${p}">+ Group</button></div></div></div>`;
+  }
+  const k=kind(n.f), ch=choices(k);
+  const val=ch?`<select class="sel" id="${id}_v" data-prop="v" data-path="${p}" aria-label="Value">${ch.map(o=>`<option${o===n.v?' selected':''}>${esc(o)}</option>`).join('')}</select>`
+              :`<input class="field" id="${id}_v" data-prop="v" data-path="${p}" value="${esc(n.v)}" placeholder="${k==='num'?'Number':'Text, case-insensitive'}" aria-label="Value">`;
+  return `<div class="cond">${not}
+    <select class="sel" id="${id}_f" data-prop="f" data-path="${p}" aria-label="Property">${FIELDS.map(f=>`<option value="${f[0]}"${f[0]===n.f?' selected':''}>${f[1]}</option>`).join('')}</select>
+    <select class="sel" id="${id}_op" data-prop="op" data-path="${p}" aria-label="Operator">${ops(k).map(o=>`<option value="${esc(o)}"${o===n.op?' selected':''}>${OPN[o]}</option>`).join('')}</select>
+    ${val}${rm}</div>`;
+}
+
+function renderList(){
+  const q=S.q.trim().toLowerCase();
+  let h='';
+  SECTIONS.forEach((s,si)=>{
+    const all=CATS.filter(c=>c.sec===si);
+    const rows=all.filter(c=>!q||c.name.toLowerCase().includes(q)||s.toLowerCase().includes(q));
+    if(!rows.length) return;
+    const shut=S.shut[si]&&!q;
+    h+=`<button type="button" class="sec${shut?' shut':''}" data-sec="${si}" aria-expanded="${!shut}">${ic('g-chev','i')}<b>${esc(s)}</b><small>${all.reduce((a,c)=>a+count(c),0)}</small></button>`;
+    if(!shut) rows.forEach(c=>{const n=count(c);
+      h+=`<button type="button" class="cat${S.view==='cat'&&c.id===S.sel?' on':''}${c.on?'':' off'}" data-id="${c.id}">${tile(c)}
+        <span class="nm">${esc(c.name)}${dirty(c)?'<i class="dot" title="Unsaved changes"></i>':''}${c.warn?ic('g-warn','i wr'):''}</span>
+        ${c.on?`<span class="n${n?'':' z'}">${n}</span>`:'<span class="tag">Off</span>'}</button>`;
+    });
+  });
+  const u=loose().length;
+  if(!q) h+=`<button type="button" class="cat inbox${S.view==='inbox'?' on':''}" data-inbox="1"><span class="tile q">${ic('g-q','i')}</span><span class="nm">Uncategorised</span><span class="n${u?'':' z'}">${u}</span></button>`;
+  $('list').innerHTML=h||'<div class="empty">No category matches that search.</div>';
+}
+function renderBag(){
+  $('bag').innerHTML=BAG.map(it=>`<button type="button" class="slot${CL.get(it.id)?'':' none'}" draggable="true" data-item="${it.id}" style="--q:${QCOL[it.q]}" aria-label="${esc(it.name)}">${ic(iicon(it))}${it.n>1?`<b>${it.n}</b>`:''}</button>`).join('');
+}
+
+function status(){
+  const c=cur(), el=$('status'); if(!el) return;
+  const d=dirty(c);
+  el.className='status'+(d?' dirty':'');
+  el.innerHTML=d?'<i class="dot"></i>Unsaved changes':esc(S.msg||'Saved');
+  $('save').disabled=!d; $('discard').disabled=!d;
+}
+const chipRow=(list,more,exc)=>`<div class="items">${list.map(it=>`<div class="item${it._lost?' lost':''}" style="--q:${QCOL[it.q]}">${itile(it)}<span class="nmq">${esc(it.name)}</span><em>${it._lost?'→ '+esc(it._lost):'×'+it.n}</em>${exc?`<button type="button" class="x" data-exc="${it.id}" title="Keep this item out" aria-label="Keep ${esc(it.name)} out">${ic('g-x','i')}</button>`:''}</div>`).join('')}</div>${more>0?`<div class="hint">and ${more} more</div>`:''}`;
+
+function previewHtml(c){
+  const m=BAG.filter(it=>hits(c,it)), unk=BAG.filter(it=>!c.manual.includes(it.id)&&ev(c.rule,it)===null).length;
+  const lost={}; m.forEach(it=>{const w=CATS.find(x=>x.id===CL.get(it.id));it._lost=(c.on&&w&&w.id!==c.id)?w.name:'';if(it._lost)(lost[w.id]=lost[w.id]||[]).push(it)});
+  const kept=m.filter(it=>!it._lost).length;
+  let conf='';
+  Object.keys(lost).forEach(wid=>{const w=CATS.find(x=>x.id===+wid),n=lost[wid].length,pin=lost[wid].every(it=>w.manual.includes(it.id));
+    conf+=`<div class="conf"><span>${n} ${n===1?'item also matches':'items also match'} <b>${esc(w.name)}</b>, which ${pin?'has it pinned':'wins'}.</span>${pin?'':`<button type="button" class="btn sm" data-win="${w.id}">Make this one win</button>`}</div>`});
+  const shown=m.slice(0,6);
+  return `<div class="blk"><p class="cap">Live preview</p>
+    <div class="psum"><span><b>${c.on?kept:0}</b> of ${BAG.length} bag items land here</span>${c.on?'':'<span class="w">Disabled, so it catches nothing</span>'}${unk?`<span class="w">${unk} can't be checked on this client</span>`:''}</div>
+    ${conf}${shown.length?chipRow(shown,m.length-shown.length,S.mode==='simple'&&!!c.simple):'<div class="hint">Nothing in your bags matches this rule right now.</div>'}</div>`;
+}
+function tabHtml(c){
+  if(S.tab==='rules'){
+    const e=expr(c.rule,true);
+    const rule=S.mode==='simple'
+      ?(c.simple?simpleHtml(c):`<div class="callout">This category uses a custom rule (for example one imported from Baganator) that the simple filters can't show.</div><div class="code">${esc(e)}</div><div class="pinrow"><button type="button" class="btn" data-mode="visual">Open in Advanced</button><button type="button" class="btn" id="sreset">Start over with simple filters</button></div>`)
+      :S.mode==='visual'
+      ?`<div class="blk">${c.simple?'<div class="hint">For power users. Changing anything here turns this into a custom rule that Simple can no longer show.</div>':''}${nodeHtml(c.rule,'')}<div class="code">${esc(e)}</div></div>`
+      :`<div class="blk"><div class="code lg">${esc(e)}</div><div class="hint">In game this box is editable: &amp; and, | or, ! not, ~ contains. The mockup shows the expression generated from the visual rule.</div></div>`;
+    return rule+previewHtml(c);
+  }
+  if(S.tab==='look') return `<div class="blk"><p class="cap">Category icon</p>
+    <div class="icons">${ICONS.map((n,i)=>`<button type="button" class="tile" style="--t:${TINTS[i]}" data-icon="${i}" aria-pressed="${i===c.icon}" aria-label="Icon ${i+1}">${ic(n,'i')}</button>`).join('')}</div></div>
+    <div><div class="orow"><label for="fileid">Icon file ID<small>Use any texture by its numeric ID.</small></label><input class="field" id="fileid" placeholder="e.g. 134400" inputmode="numeric" style="max-width:180px"></div></div>`;
+  return `${c.warn?`<div class="warnbox">${ic('g-warn','i')}<span><b>Import warning.</b> ${esc(c.warn)}</span></div>`:''}
+    <div><div class="orow"><label for="prio">Priority<small>When two categories match the same item, the higher one wins. Equal priority goes to the one higher in the list.</small></label><select class="sel" id="prio" style="max-width:180px">${PRIO.map((p,i)=>`<option value="${i}"${i===c.prio?' selected':''}>${p}</option>`).join('')}</select></div>
+    <div class="orow"><div class="lab">Pinned items<small>Always land here, whatever the rule says. Drop a bag item on this category to pin it.</small></div><div class="chips">${c.manual.length?c.manual.map(id=>{const it=item(id);return `<span class="chip" style="--q:${QCOL[it.q]}">${esc(it.name)}<button type="button" class="x" data-unpin="${id}" aria-label="Unpin ${esc(it.name)}">${ic('g-x','i')}</button></span>`}).join(''):'<span class="hint">No pinned items.</span>'}</div></div></div>`;
+}
+
+function catHtml(c){
+  return `<div class="ehead">
+      <button type="button" class="tile big" style="--t:${TINTS[c.icon]}" id="iconbtn" title="Change icon">${ic(ICONS[c.icon],'i')}</button>
+      <div><input class="ename" id="ename" value="${esc(c.name)}" aria-label="Category name">
+        <div class="emeta"><span>in</span><select class="sel" id="esec" aria-label="Parent category">${SECTIONS.map((s,i)=>`<option value="${i}"${i===c.sec?' selected':''}>${esc(s)}</option>`).join('')}</select><span>· ${PRIO[c.prio]} priority</span></div></div>
+      <div class="togw"><span id="onlbl">${c.on?'Enabled':'Disabled'}</span><button type="button" class="tog" id="eon" role="switch" aria-checked="${c.on}" aria-labelledby="onlbl"></button></div>
+    </div>
+    <div class="sub" role="tablist">
+      ${[['rules','Rules'],['look','Appearance'],['adv','Advanced']].map(t=>`<button type="button" role="tab" data-tab="${t[0]}" aria-selected="${S.tab===t[0]}">${t[1]}${t[0]==='adv'&&c.warn?ic('g-warn','i wr'):''}</button>`).join('')}
+      ${S.tab==='rules'?`<div class="seg"><button type="button" class="btn ghost" data-mode="simple" aria-pressed="${S.mode==='simple'}">Simple</button><button type="button" class="btn ghost" data-mode="visual" aria-pressed="${S.mode==='visual'}">Advanced</button><button type="button" class="btn ghost" data-mode="expr" aria-pressed="${S.mode==='expr'}">Text</button></div>`:''}
+    </div>
+    <div class="escroll" id="escroll">${tabHtml(c)}</div>
+    <div class="abar"><div class="status" id="status"></div>
+      <button type="button" class="btn ghost" id="dup">Duplicate</button>
+      <button type="button" class="btn ghost${S.arm?' arm':''}" id="del">${S.arm?'Click again to delete':'Delete'}</button>
+      <button type="button" class="btn" id="discard">Discard</button>
+      <button type="button" class="btn pri" id="save">Save changes</button></div>`;
+}
+
+/* create from item */
+function fiSimple(f){const it=item(f.id),s=sm({});
+  if(f.exact) return s;
+  if(f.s) s.kinds.push(it.type+': '+it.sub); else if(f.t) s.kinds.push(it.type);
+  if(f.q) s.qmin=it.q;
+  if(f.n&&f.ntext) s.words=f.ntext;
+  return s;
+}
+const fiRule=f=>compile(fiSimple(f));
+function fromItem(id){const it=item(id);
+  S.fi={id:it.id,name:it.sub==='Other'||it.sub==='Quest'?it.name:it.sub,sec:cur()?cur().sec:0,t:false,s:true,q:false,n:false,ntext:it.name.split(' ').pop(),exact:false,pin:CATS[0].id};
+  S.view='fi';draw();
+}
+function fiHtml(){const f=S.fi,it=item(f.id),rule=fiRule(f);
+  const m=f.exact?[it]:BAG.filter(x=>ev(rule,x)===true), none=!f.exact&&!(f.t||f.s||f.q||(f.n&&f.ntext));
+  const row=(k,label,val,extra='')=>`<label class="chk${f.exact&&k!=='exact'?' dis':''}" for="fi_${k}"><input type="checkbox" id="fi_${k}" data-fi="${k}"${f[k]?' checked':''}${f.exact&&k!=='exact'?' disabled':''}><b>${label}</b>${extra||`<span>${esc(val)}</span>`}</label>`;
+  return `<div class="ehead"><span class="tile big" style="--t:${QCOL[it.q]}">${ic(iicon(it),'i')}</span>
+      <div><h3>New category from ${esc(it.name)}</h3><div class="emeta"><span>${esc(it.type)} · ${esc(it.sub)} · ${QUAL[it.q]}${where(it)?' · currently in '+esc(where(it)):' · not in any category yet'}</span></div></div><span></span></div>
+    <div class="escroll" id="escroll">
+      <div><div class="orow"><label for="finame">Category name</label><input class="field" id="finame" value="${esc(f.name)}"></div>
+        <div class="orow"><label for="fisec">Parent category</label><select class="sel" id="fisec" style="max-width:240px">${SECTIONS.map((s,i)=>`<option value="${i}"${i===f.sec?' selected':''}>${esc(s)}</option>`).join('')}</select></div></div>
+      <div class="blk"><p class="cap">Catch items like this one, where</p><div>
+        ${row('s','Subtype is',it.type+': '+it.sub)}
+        ${row('t','Type is',it.type)}
+        ${row('q','Quality is at least',QUAL[it.q])}
+        ${row('n','Name contains','',`<input class="field" id="fintext" value="${esc(f.ntext)}" aria-label="Name contains"${f.exact?' disabled':''}>`)}
+        ${row('exact','Only this exact item','Pin it, no rule')}
+      </div></div>
+      <div class="blk"><p class="cap">Would catch</p>
+        ${none?'<div class="hint">Tick at least one box.</div>':`<div class="psum"><span><b>${m.length}</b> ${m.length===1?'item':'items'} in your bags</span></div>${chipRow(m.slice(0,9).map(x=>({...x,_lost:''})),m.length-9)}`}</div>
+      <div class="blk"><p class="cap">Or pin it to an existing category</p><div class="pinrow"><select class="sel" id="fipinsel" aria-label="Existing category">${CATS.map(c=>`<option value="${c.id}"${c.id===f.pin?' selected':''}>${esc(SECTIONS[c.sec]+' › '+c.name)}</option>`).join('')}</select><button type="button" class="btn" id="fipin">Pin here</button></div></div>
+    </div>
+    <div class="abar"><div class="status">The category is enabled as soon as you create it.</div>
+      <button type="button" class="btn" id="ficancel">Cancel</button>
+      <button type="button" class="btn pri" id="ficreate"${none?' disabled':''}>Create category</button></div>`;
+}
+function addCat(sec,name,icon,rule,manual,msg){
+  const s=sm(rule||{}),c=mk(sec,name||'New Category',icon,compile(s),{manual:manual||[],simple:s});c.saved=snap(c);S.mode='simple';
+  let i=CATS.length;for(let j=CATS.length-1;j>=0;j--) if(CATS[j].sec===sec){i=j+1;break}
+  CATS.splice(i,0,c);S.shut[sec]=false;S.sel=c.id;S.view='cat';S.tab='rules';classify();S.msg=msg||`Created and enabled. ${count(c)} bag items moved in.`;draw();
+}
+function pin(it,c){CATS.forEach(x=>{x.manual=x.manual.filter(i=>i!==it.id)});c.manual.push(it.id);S.sel=c.id;S.view='cat';S.tab='adv';S.msg='';draw()}
+
+function galleryHtml(){
+  return `<div class="ehead"><span class="tile big" style="--t:var(--accent)">${ic('g-plus','i')}</span><div><h3>New category</h3><div class="emeta"><span>Added to ${esc(SECTIONS[cur()?cur().sec:0])}. You can move it afterwards.</span></div></div><span></span></div>
+    <div class="escroll" id="escroll">
+      <div class="callout">Fastest way: drag an item from your bags onto this panel and the category is filled in from it.</div>
+      <div class="blk"><p class="cap">Ready-made categories</p><div class="gal">
+        ${TPL.map((t,i)=>{const r=compile(sm(t[2])),n=BAG.filter(it=>ev(r,it)===true).length;return `<button type="button" class="card" data-tpl="${i}"><span class="tile" style="--t:${TINTS[t[1]]}">${ic(ICONS[t[1]],'i')}</span><b>${esc(t[0])}</b><small class="${n?'has':''}">${n?n+' in your bags':'Nothing in your bags yet'}</small></button>`}).join('')}
+        <button type="button" class="card" data-tpl="-1"><span class="tile q">${ic('g-plus','i')}</span><b>Blank category</b><small>Build the rule yourself</small></button>
+      </div></div>
+    </div>
+    <div class="abar"><div class="status"></div><button type="button" class="btn" id="ficancel">Cancel</button></div>`;
+}
+function inboxHtml(){const u=loose();
+  return `<div class="ehead"><span class="tile big q">${ic('g-q','i')}</span><div><h3>Uncategorised</h3><div class="emeta"><span>${u.length} bag ${u.length===1?'item is':'items are'} not caught by any category.</span></div></div><span></span></div>
+    <div class="escroll" id="escroll">
+      ${u.length?`<div class="blk"><p class="cap">Click an item to make a category from it</p><div class="items">${u.map(it=>`<button type="button" class="item" data-pick="${it.id}" style="--q:${QCOL[it.q]}">${itile(it)}<span class="nmq">${esc(it.name)}</span><em>${esc(it.sub)}</em></button>`).join('')}</div></div>`:'<div class="callout">Everything in your bags has a category.</div>'}
+    </div>
+    <div class="abar"><div class="status">In the bag these appear under "Uncategorised" at the bottom.</div></div>`;
+}
+
+function renderEditor(){
+  $('editor').innerHTML=S.view==='fi'?fiHtml():S.view==='gallery'?galleryHtml():S.view==='inbox'?inboxHtml():catHtml(cur());
+  if(S.view==='cat') status();
+}
+function draw(keepScroll){const sc=$('escroll'),y=keepScroll&&sc?sc.scrollTop:0;classify();renderList();renderEditor();renderBag();if(y)$('escroll').scrollTop=y}
+
+$('q').addEventListener('input',e=>{S.q=e.target.value;renderList()});
+$('new').addEventListener('click',()=>{S.view='gallery';draw()});
+$('list').addEventListener('click',e=>{
+  const s=e.target.closest('.sec'), c=e.target.closest('.cat');
+  if(s){S.shut[s.dataset.sec]=!S.shut[s.dataset.sec];renderList()}
+  else if(c&&c.dataset.inbox){S.view='inbox';draw()}
+  else if(c){S.sel=+c.dataset.id;S.view='cat';S.arm=false;S.msg='';draw()}
+});
+const E=$('editor');
+E.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return; const c=cur(), d=b.dataset;
+  if(b.id!=='del') S.arm=false;
+  if(d.pick) return fromItem(d.pick);
+  if(d.tpl!==undefined){const t=TPL[+d.tpl];return t?addCat(c.sec,t[0],t[1],t[2]):addCat(c.sec,'New Category',12,{},[],'Created. Choose filters below, or drop an item on it.')}
+  if(b.id==='ficancel'){S.view='cat';return draw()}
+  if(b.id==='ficreate'){const f=S.fi,it=item(f.id);return addCat(f.sec,f.name,Math.max(0,ICONS.indexOf(iicon(it))),fiSimple(f),f.exact?[it.id]:[])}
+  if(b.id==='fipin') return pin(item(S.fi.id),CATS.find(x=>x.id===S.fi.pin));
+  if(d.unpin){c.manual=c.manual.filter(i=>i!==+d.unpin);return draw(true)}
+  if(d.win){const w=CATS.find(x=>x.id===+d.win);if(w.prio>=4){CATS.splice(CATS.indexOf(c),1);CATS.splice(CATS.indexOf(w),0,c)}else c.prio=w.prio+1;return draw(true)}
+  if(d.tab){S.tab=d.tab;return draw()}
+  if(d.mode){S.mode=d.mode;return draw()}
+  if(d.icon){c.icon=+d.icon;return draw()}
+  if(b.id==='iconbtn'){S.tab='look';return draw()}
+  if(b.id==='eon'){c.on=!c.on;return draw(true)}
+  if(b.id==='save'){c.saved=snap(c);S.msg='Saved. Inventory refreshed.';return draw(true)}
+  if(b.id==='discard'){const v=JSON.parse(c.saved);[c.name,c.on,c.sec,c.prio,c.manual,c.icon,c.rule,c.simple]=v;S.msg='Draft discarded.';return draw()}
+  if(b.id==='dup'){const n=JSON.parse(JSON.stringify(c));n.id=++uid;n.name=c.name+' copy';n.manual=[];n.saved='';CATS.splice(CATS.indexOf(c)+1,0,n);S.sel=n.id;return draw()}
+  if(b.id==='del'){if(!S.arm){S.arm=true;return draw(true)}const i=CATS.indexOf(c);if(CATS.length>1){CATS.splice(i,1);S.sel=CATS[Math.max(0,i-1)].id}S.arm=false;S.msg='Category deleted.';return draw()}
+  if(b.id==='sreset'){c.simple=sm({});c.rule=compile(c.simple);return draw()}
+  if(c.simple&&(d.skind||d.sslot||d.sexc||d.exc)){const s=c.simple;
+    if(d.skind) s.kinds.splice(+d.skind,1);
+    if(d.sslot) s.slots.splice(+d.sslot,1);
+    if(d.sexc) s.except.splice(+d.sexc,1);
+    if(d.exc&&!s.except.includes(+d.exc)) s.except.push(+d.exc);
+    c.rule=compile(s);return draw(true)}
+  const a=d.act; if(!a) return; const p=d.path, n=node(p); c.simple=null;
+  if(a==='neg') n.neg=!n.neg;
+  if(a==='addc') n.c.push(C('name','~',''));
+  if(a==='addg') n.c.push(G(n.mode==='ALL'?'ANY':'ALL',[C('name','~','')]));
+  if(a==='rm'){const parts=p.split('.'),i=+parts.pop();node(parts.join('.')).c.splice(i,1)}
+  draw(true);
+});
+E.addEventListener('change',e=>{
+  const t=e.target, c=cur(), f=S.fi;
+  if(t.dataset.fi){f[t.dataset.fi]=t.checked;return draw(true)}
+  if(t.id==='fintext'){f.ntext=t.value.trim();f.n=!!f.ntext;return draw(true)}
+  if(t.id==='fisec'){f.sec=+t.value;return}
+  if(t.id==='fipinsel'){f.pin=+t.value;return}
+  if(t.id==='finame') return;
+  if(t.id==='esec'){c.sec=+t.value;return draw()}
+  if(t.id==='prio'){c.prio=+t.value;return draw()}
+  const sk=t.dataset.s;
+  if(sk&&c.simple){const s=c.simple,v=t.value;
+    if(sk==='kindadd'&&v&&!s.kinds.includes(v)) s.kinds.push(v);
+    if(sk==='slotadd'&&v&&!s.slots.includes(v)) s.slots.push(v);
+    if(sk==='qmin'){s.qmin=+v;if(s.qmax<s.qmin)s.qmax=s.qmin}
+    if(sk==='qmax'){s.qmax=+v;if(s.qmin>s.qmax)s.qmin=s.qmax}
+    if(sk==='bind'||sk==='quest') s[sk]=v;
+    if(sk==='words') s.words=v;
+    c.rule=compile(s);return draw(true)}
+  const prop=t.dataset.prop; if(!prop) return; const n=node(t.dataset.path); c.simple=null;
+  n[prop]=t.value;
+  if(prop==='f'){const k=kind(n.f);n.op=ops(k)[0];n.v=(choices(k)||[''])[k==='quality'?2:0]}
+  draw(true);
+});
+E.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='ename'){cur().name=t.value;renderList();status()}
+  if(t.id==='finame') S.fi.name=t.value;
+});
+
+/* bag: hover explains, click or drag creates / pins */
+const bag=$('bag'), body=$('body'); let dragId=0;
+const clearDrop=()=>document.querySelectorAll('.drop').forEach(x=>x.classList.remove('drop'));
+bag.addEventListener('mouseover',e=>{const s=e.target.closest('.slot');if(!s)return;const it=item(s.dataset.item),w=where(it);
+  $('why').innerHTML=`<b>${esc(it.name)}</b> · ${w?'BagRules: '+esc(w)+(CATS.find(c=>c.id===CL.get(it.id)).manual.includes(it.id)?' (pinned)':' (rule)'):'not caught by any category'}`});
+bag.addEventListener('click',e=>{const s=e.target.closest('.slot');if(s)fromItem(s.dataset.item)});
+bag.addEventListener('dragstart',e=>{const s=e.target.closest('.slot');if(!s)return;dragId=+s.dataset.item;e.dataTransfer.setData('text/plain',String(dragId));e.dataTransfer.effectAllowed='copy'});
+bag.addEventListener('dragend',()=>{dragId=0;clearDrop()});
+body.addEventListener('dragover',e=>{if(!dragId)return;e.preventDefault();clearDrop();const row=e.target.closest('.cat:not(.inbox)');(row||E).classList.add('drop')});
+body.addEventListener('dragleave',e=>{if(!body.contains(e.relatedTarget))clearDrop()});
+body.addEventListener('drop',e=>{if(!dragId)return;e.preventDefault();const row=e.target.closest('.cat:not(.inbox)'),it=item(dragId);dragId=0;clearDrop();
+  if(row) pin(it,CATS.find(c=>c.id===+row.dataset.id)); else fromItem(it.id)});
+draw();
+</script>

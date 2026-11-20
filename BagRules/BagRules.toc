@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: |cff07d59dBagRules|r for EllesmereUI
+## Notes: User-defined dynamic inventory categories. Development preview.
+## Version: 0.4.0-alpha
+## Dependencies: EllesmereUI, EllesmereUIBags
+## OptionalDeps: Auctionator
+## SavedVariables: BagRulesDB
+RuleEngine.lua
+Import.lua
+Core.lua
+RuntimeSections.lua
+VisualRules.lua
+Options.lua
