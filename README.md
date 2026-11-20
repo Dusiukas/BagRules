@@ -10,6 +10,18 @@ Designed for flexibility and integration with the native inventory experience, B
 
 See the [BagRules screenshot gallery](SCREENSHOTS.md) for the category manager, hierarchical bag view, and searchable icon browser.
 
+### Category manager
+
+![BagRules category manager integrated into EllesmereUI](docs/images/category-manager.png)
+
+### Hierarchical inventory
+
+![BagRules hierarchical categories in the inventory sidebar](docs/images/bag-hierarchy.png)
+
+### Icon browser
+
+![BagRules searchable icon browser](docs/images/icon-browser.png)
+
 ## Features
 
 ### Custom inventory organization
