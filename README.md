@@ -1,5 +1,7 @@
 # BagRules
 
+> **Alpha software:** BagRules is under active development. Features, interfaces, compatibility, and data formats may change between releases.
+
 **Your bags. Your categories. Your rules.**
 
 BagRules is an advanced inventory management addon for World of Warcraft, developed as part of **EllesmereUI (EUI)**. It gives players greater control over how items are categorized, organized, and displayed through customizable categories, subcategories, rule-based organization, and intelligent icon selection.
