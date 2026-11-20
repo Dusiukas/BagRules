@@ -2,19 +2,7 @@
 
 > **Alpha software:** BagRules is under active development. Features, interfaces, compatibility, and data formats may change between releases.
 
-## Current alpha: 0.7.4-alpha.1
-
-The repository now contains the complete 0.7.4 development source plus a combat hierarchy hotfix. BagRules preserves its last valid green parent headers and grouped sidebar during combat, then schedules a clean rebuild immediately after combat ends.
-
-The generated local icon filename index is not included in public source or packages because redistribution permission remains unresolved. Icon browsing continues to use client-discovered metadata and the optional `IconFileNames` addon.
-
-Aggregate/selectable parent views were described for an unrecovered 0.7.5 build and are not claimed by this release.
-
-**Your bags. Your categories. Your rules.**
-
-BagRules is an advanced inventory management addon for World of Warcraft, developed as part of **EllesmereUI (EUI)**. It gives players greater control over how items are categorized, organized, and displayed through customizable categories, subcategories, rule-based organization, and intelligent icon selection.
-
-Designed for flexibility and integration with the native inventory experience, BagRules lets players build an inventory hierarchy that suits their playstyle.
+BagRules is a WoW Forever inventory-classification addon developed for the EllesmereUI (EUI) ecosystem. It adds user-defined categories, parent sections, rules, previews, and import/export without replacing EUI's bag interface or physically moving items.
 
 ## Screenshots
 
@@ -32,90 +20,56 @@ See the [BagRules screenshot gallery](SCREENSHOTS.md) for the category manager, 
 
 ![BagRules searchable icon browser](docs/images/icon-browser.png)
 
-## Features
+## Repository status
 
-### Custom inventory organization
+The current development source is **0.7.4-alpha.1**. It updates the repository to the recovered 0.7.4 code and adds a combat hierarchy hotfix: valid green parent headers and grouped sidebar state are retained during combat, then rebuilt on a delayed refresh after combat ends.
 
-- Create custom categories and subcategories.
-- Organize items using configurable rules.
-- Group subcategories under collapsible parent headers, or browse individual subcategories.
-- Customize category and subcategory names and icons.
-- Register native virtual bag categories using a hierarchical structure.
+A conversation describes a later **0.7.5-alpha** build with selectable parent categories, but that source archive has not been recovered. Parent headers in 0.7.4 group and collapse children; they do not select an aggregate parent view.
 
-### Advanced icon browser
+| Evidence | State |
+|---|---|
+| Checked-in `BagRules/` | 0.7.4-alpha.1; current development source |
+| Original recovered package | 0.7.4-alpha; preserved privately and locally |
+| Conversation-only build | 0.7.5-alpha; attachment missing |
 
-- Browse an extensive collection of World of Warcraft icons.
-- Search across the client-discovered icon catalogue and available metadata.
-- Explore thematic icon categories.
-- Scroll continuously through available icons without pagination.
-- Assign icons to individual categories and subcategories.
-- Receive intelligent icon suggestions based on category names.
+See [Project context](docs/PROJECT_CONTEXT.md), [Requirements](docs/REQUIREMENTS.md), and [Development history](docs/DEVELOPMENT_HISTORY.md) for the migration record.
 
-### Configuration and integration
+## Current checked-in capabilities
 
-- Centralized configuration interface.
-- Flexible rule-based inventory organization.
-- Integration with native bag categories.
-- Designed as part of the EllesmereUI (EUI) ecosystem.
+- Create, rename, enable, duplicate, reorder, and delete parent sections and categories.
+- Build nested ALL/ANY/NOT rules or use expression mode.
+- Assign explicit item IDs with precedence over rules.
+- Classify by item metadata and optional Auctionator prices while preserving unknown values.
+- Keep classification priority and visual display order separate.
+- Preview matches and competing categories before saving.
+- Edit native metadata filters or retain advanced legacy expressions.
+- Import/export BagRules formats 1–7 and prepare Baganator-style input conservatively.
+- Preview and convert compatible legacy rules while retaining unsupported rules with warnings.
+- Register an independent EUI virtual view when available, with a native virtual-category fallback.
+- Group native sidebar categories under collapsible parent headers.
+- Browse and search client-discovered icons using a recycled, continuously scrolling picker.
+- Use optional `IconFileNames` metadata for additional icon labels.
+- Open settings with `/bagrules` or `/brules`; use `status`, `refresh`, or `fallback` as subcommands.
 
-## Installation
+The generated 33,823-entry local icon filename index is not cleared for public redistribution and is therefore excluded from public source/packages. The picker continues to work with client metadata and the optional `IconFileNames` addon. Selectable aggregate parent views remain unrecovered 0.7.5 functionality.
 
-1. Download the latest available release ZIP from GitHub Releases.
-2. Extract the archive.
-3. Copy the `BagRules` folder into your World of Warcraft `Interface/AddOns` directory.
-4. Restart World of Warcraft or reload the user interface using `/reload`.
-5. Ensure BagRules is enabled in the AddOns menu.
+## Installation for development review
 
-## Compatibility
+1. Back up the character/account `WTF` data that contains `BagRulesDB`.
+2. Copy the checked-in `BagRules` directory to the WoW Forever `Interface/AddOns` directory.
+3. Enable EllesmereUI, EllesmereUIBags, and BagRules. Auctionator is optional.
+4. Restart the client or run `/reload`, then open `/bagrules`.
 
-BagRules is currently being developed for **WoW Forever** as part of EllesmereUI (EUI).
+The checked-in TOC targets interface `16001`. Other clients and EUI releases have not been verified.
 
-Compatibility with other World of Warcraft clients and versions has not yet been verified. Consult the release notes for version-specific requirements and dependencies.
+## Verification status
 
-## Development status
+No executable test harness or test fixtures were found in the repository or any of the 17 recovered release ZIPs. Historical release notes claim mock tests, but those results cannot currently be reproduced. The combat fix has been statically reviewed and installed locally, but still requires a live enter-combat/leave-combat test. Other WoW/EUI layout, taint, bank, offline inventory, and upgrade behavior also require testing. See [Testing](docs/TESTING.md).
 
-BagRules is under active development. Features, interfaces, and functionality may change between releases.
+## Contributing and privacy
 
-The project focuses on customization, usability, performance, and integration with the existing inventory experience.
-
-## Roadmap
-
-- [ ] Expand inventory rule options.
-- [ ] Improve automatic item categorization.
-- [ ] Expand icon metadata and searchable labels.
-- [ ] Improve intelligent icon recommendations.
-- [ ] Add category and rule import/export.
-- [ ] Introduce shareable configuration profiles.
-- [ ] Optimize inventory processing and performance.
-- [ ] Evaluate compatibility with other inventory addons.
-- [ ] Introduce automated release packaging.
-
-## Bug reports and feature requests
-
-Use GitHub Issues to report bugs, suggest improvements, or request new features.
-
-When reporting a bug, include:
-
-- BagRules version.
-- World of Warcraft client version.
-- EllesmereUI version, if applicable.
-- Description of the issue.
-- Steps to reproduce the issue.
-- Lua error messages, if available.
-- Screenshots, where applicable.
-
-## Contributing
-
-Feedback, suggestions, and contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request.
+Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before making changes. Raw ChatGPT transcripts, screenshots that may contain personal data, release recovery material, and private manifests are intentionally stored outside this public repository and must not be committed.
 
 ## License
 
-Project licensing is pending final review. Third-party code, dependencies, and icon metadata remain subject to their respective licenses and terms.
-
-World of Warcraft and its associated assets are the property of Blizzard Entertainment. BagRules is an independent community project and is not affiliated with or endorsed by Blizzard Entertainment.
-
----
-
-**BagRules — Inventory organization without unnecessary limitations.**
-
-*Part of EllesmereUI (EUI).*
+Project licensing is pending review. Third-party dependencies and icon metadata have their own terms, and redistribution rights for the recovered generated icon filename database remain unresolved. World of Warcraft and its assets are property of Blizzard Entertainment. BagRules is an independent community project and is not affiliated with or endorsed by Blizzard Entertainment.
