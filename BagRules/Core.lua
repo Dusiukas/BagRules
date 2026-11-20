@@ -1,6 +1,7 @@
 local ADDON, BR = ...
 local R=BR.Rules
-BR.version="0.4.0-alpha"
+local F=BR.Filters
+BR.version="0.7.4-alpha.1"
 local defaults={
     {name="Quest Items",expr="quest",icon=134400},
     {name="Recipes",expr="recipe",icon=134939},
@@ -60,6 +61,12 @@ function BR:RenameSection(key,name)
     if self.RuntimeSections and self.RuntimeSections.collapsed then local t=self.RuntimeSections.collapsed;t[name]=t[old];if old~=name then t[old]=nil end end
     self:Apply();return true
 end
+function BR:SetSectionIcon(key,icon)
+    local g=self:GetSection(key);if not g then return nil,"Parent not found" end
+    if InCombatLockdown and InCombatLockdown() then return nil,"Change icons outside combat" end
+    if icon~=nil and safeIcon(icon)~=tonumber(icon) then return nil,"Invalid icon file ID" end
+    g.icon=icon and tonumber(icon) or nil;self:Apply();return true
+end
 function BR:SetSectionEnabled(key,on)
     local g=self:GetSection(key);if not g then return nil,"Parent not found" end;g.enabled=not not on;self:Apply();return true
 end
@@ -83,14 +90,15 @@ function BR:DuplicateSection(key,name)
     local src=self:GetSection(key);if not src then return nil,"Parent not found" end
     local children={};for _,c in ipairs(self.db.categories) do if c.sectionID==src.id then children[#children+1]=c end end
     if #self.db.categories+#children>100 then return nil,"Maximum 100 subcategories" end
-    local g,e=self:NewSection(name);if not g then return nil,e end;g.enabled=src.enabled
+    local g,e=self:NewSection(name);if not g then return nil,e end;g.enabled=src.enabled;g.icon=src.icon
     for _,c in ipairs(children) do local t=copy(c);t.sectionID=g.id;t.section=g.name;self:NewCategory(t) end
     self:Apply();return g
 end
 function BR:SectionEnabled(c) local g=self:GetSection(c.sectionID);return not g or g.enabled~=false end
 function BR:NewCategory(template)
     if #self.db.categories>=100 then return nil,"Maximum 100 categories in this alpha" end
-    local c=copy(template or {name="New Category",expr='name ~ "Linen"',icon=134400,enabled=false})
+    local c=copy(template or {name="New Subcategory",expr="never",filters={},icon=134400,enabled=true})
+    if c.filters~=nil then local f,e=F.Validate(c.filters);if not f then return nil,e end;c.filters=f;c.expr="never" end
     self.db.nextID=self.db.nextID+1; c.id="c"..self.db.nextID; c.enabled=c.enabled~=false
     c.icon=safeIcon(c.icon);c.name=cleanName(c.name);if c.name=="" then c.name="New Subcategory" end
     c.priority=priority(c.priority); c.manual=manualIDs(c.manual); c.section=text(c.section,80); c.sourceSearch=text(c.sourceSearch,4096); c.source=text(c.source,100); c.warning=text(c.warning,2048)
@@ -108,12 +116,22 @@ function BR:Initialize()
         if type(g)=="table" and type(g.id)=="string" then
             local name=cleanName(g.name);local n=g.id:match("^s(%d+)$")
             if (n and name~="" or g.id=="ungrouped" and name=="") and not ids[g.id] and not names[name] then
-                ids[g.id]=true;names[name]=true;cleanedSections[#cleanedSections+1]={id=g.id,name=name,enabled=g.enabled~=false};self.db.nextSectionID=math.max(self.db.nextSectionID,tonumber(n) or 0)
+                ids[g.id]=true;names[name]=true;cleanedSections[#cleanedSections+1]={id=g.id,name=name,enabled=g.enabled~=false,icon=g.icon and safeIcon(g.icon) or nil};self.db.nextSectionID=math.max(self.db.nextSectionID,tonumber(n) or 0)
             end
         end
     end
     self.db.sections=cleanedSections
-    if type(self.db.categories)~="table" then self.db.categories={}; self.db.nextID=0; for _,t in ipairs(defaults) do self:NewCategory(t) end end
+    if type(self.db.categories)~="table" then
+        self.db.categories={};self.db.nextID=0
+        local catalogue=F.Catalogue()
+        for _,g in ipairs(F.Suggestions(catalogue)) do
+            local seen={};for _,t in ipairs(g.children) do
+                local name=cleanName(t.name);if name~="" and not seen[name:lower()] and #self.db.categories<100 then
+                    seen[name:lower()]=true;self:NewCategory({name=name,section=g.name,filters=t.filters,icon=t.icon,enabled=true})
+                end
+            end
+        end
+    end
     self.db.nextID=math.max(0,math.floor(tonumber(self.db.nextID) or 0))
     self.db.enabled=self.db.enabled~=false
     self.db.native=self.db.native==true
@@ -128,14 +146,18 @@ function BR:Initialize()
     if self.db.sectionLayout~="paths" and self.db.sectionLayout~="categories" and self.db.sectionLayout~="sections" and self.db.sectionLayout~="hierarchy" then self.db.sectionLayout="hierarchy" end
     local cleaned,seen={},{}; local tieSeen={}; local validTies=true
     for _,c in ipairs(self.db.categories) do
-        if type(c)=="table" and type(c.expr)=="string" and #cleaned<100 then
+        if type(c)=="table" and (type(c.expr)=="string" or c.filters~=nil) and #cleaned<100 then
             local id=type(c.id)=="string" and c.id:match("^c%d+$") and c.id or nil
             if id then self.db.nextID=math.max(self.db.nextID,tonumber(id:sub(2)) or 0) end
             if not id or seen[id] then repeat self.db.nextID=self.db.nextID+1; id="c"..self.db.nextID until not seen[id] end
             seen[id]=true
             local name=cleanName(c.name); if name=="" then name="Unnamed" end
             local tie=tonumber(c.tie); if not tie or tie<1 or tie>2147483647 or tie%1~=0 or tieSeen[tie] then validTies=false else tieSeen[tie]=true end
-            cleaned[#cleaned+1]={tie=tie,id=id,name=name,expr=c.expr:sub(1,8192),icon=safeIcon(c.icon),enabled=c.enabled~=false,priority=priority(c.priority),manual=manualIDs(c.manual),sectionID=type(c.sectionID)=="string" and c.sectionID or nil,section=cleanName(c.section),sourceSearch=text(c.sourceSearch,4096),source=text(c.source,100),warning=text(c.warning,2048)}
+            cleaned[#cleaned+1]={tie=tie,id=id,name=name,expr=text(c.expr,8192),icon=safeIcon(c.icon),enabled=c.enabled~=false,priority=priority(c.priority),manual=manualIDs(c.manual),sectionID=type(c.sectionID)=="string" and c.sectionID or nil,section=cleanName(c.section),sourceSearch=text(c.sourceSearch,4096),source=text(c.source,100),warning=text(c.warning,2048)}
+            if c.filters~=nil then
+                local f,e=F.Validate(c.filters);local out=cleaned[#cleaned];out.expr="never"
+                if f then out.filters=f else out.filters={};out.enabled=false;out.warning="Invalid saved native filters; category disabled: "..e end
+            end
         end
     end
     if not validTies then for i,c in ipairs(cleaned) do c.tie=i end end
@@ -145,13 +167,18 @@ end
 function BR:Get(id)
     for i,c in ipairs(self.db.categories) do if c.id==id then return c,i end end
 end
-function BR:SaveCategory(id,name,expr,icon,p,section,manual,enabled)
+function BR:SaveCategory(id,name,expr,icon,p,section,manual,enabled,filters)
     local c=self:Get(id); if not c then return nil,"Unknown category" end
     name=cleanName(name); if name=="" then return nil,"Category name cannot be empty" end
-    local ast,err=R.Compile(expr); if not ast then return nil,err end
+    local f,err
+    if filters~=nil then f,err=F.Validate(filters);if not f then return nil,err end;expr="never" else local ast;ast,err=R.Compile(expr);if not ast then return nil,err end end
     if p~=nil and (not tonumber(p) or tonumber(p)~=priority(p)) then return nil,"Priority must be an integer from -10000 to 10000" end
     if manual~=nil and type(manual)~="table" then return nil,"Invalid manual items" end
-    if expr~=c.expr then c.sourceSearch=""; c.warning="" end
+    if expr~=c.expr or (f~=nil)~=(c.filters~=nil) or (f and F.Encode(f)~=F.Encode(c.filters)) then
+        local translated=not c.filters and f and F.Translate(c.expr)
+        if not translated or F.Encode(translated)~=F.Encode(f) then c.sourceSearch=""; c.warning="" end
+    end
+    c.filters=f
     c.name=name; c.expr=expr; c.icon=safeIcon(icon); if p~=nil then c.priority=priority(p) end; if section~=nil then local g=self:FindSection(section) or self:EnsureSection(section);c.sectionID=g.id;c.section=g.name end; if manual~=nil then c.manual=manualIDs(manual) end; if enabled~=nil then c.enabled=enabled==true end; self:Apply(); return true
 end
 function BR:Delete(id)
@@ -162,7 +189,7 @@ function BR:SectionGroups()
     self:SyncHierarchy()
     local groups,byName={},{}
     for _,g in ipairs(self.db.sections) do
-        local view={section=g.name,id=g.id,enabled=g.enabled,categories={}}
+        local view={section=g.name,id=g.id,enabled=g.enabled,icon=g.icon,categories={}}
         groups[#groups+1]=view;byName[g.name]=view
     end
     for _,c in ipairs(self.db.categories) do local a=byName[c.section].categories;a[#a+1]=c end
@@ -259,10 +286,11 @@ function BR:Item(link,id,bag,slot,quality)
     end
     return item
 end
+local function eval(c,item) if c.filters then return F.Eval(c.filters,item) end;return R.Eval(c.ast,item) end
 local function explicit(c,id) return id~=nil and c.manual[id]==true end
 function BR:ClassifyItem(item)
     for _,c in ipairs(compiled) do if explicit(c,item.id) then return c.id end end
-    for _,c in ipairs(compiled) do if R.Match(c.ast,item) then return c.id end end
+    for _,c in ipairs(compiled) do if eval(c,item)==true then return c.id end end
 end
 function BR:Classify(link,id,bag,slot,quality)
     return self:ClassifyItem(self:Item(link,id,bag,slot,quality))
@@ -276,11 +304,12 @@ function BR:Apply()
     if self.db.enabled then
         for i,c in ipairs(self.db.categories) do
             if c.enabled and self:SectionEnabled(c) then
-                local ast=R.Compile(c.expr)
-                if ast then
+                local ast=not c.filters and R.Compile(c.expr)
+                local filters=c.filters and F.Validate(c.filters)
+                if ast or filters then
                     local ids={}; for _,id in ipairs(c.manual or {}) do ids[id]=true end
-                    compiled[#compiled+1]={id=c.id,ast=ast,name=c.name,icon=c.icon,priority=c.priority or 0,display=i,tie=c.tie or i,manual=ids,section=c.section or ""}
-                    if needsPrices(ast) then self.usePrices=true end
+                    compiled[#compiled+1]={id=c.id,ast=ast,filters=filters,name=c.name,icon=c.icon,priority=c.priority or 0,display=i,tie=c.tie or i,manual=ids,section=c.section or ""}
+                    if needsPrices(ast) or F.NeedsPrices(filters) then self.usePrices=true end
                 else self.invalid=self.invalid+1 end
             end
         end
@@ -306,6 +335,7 @@ function BR:Apply()
     end
     if canNative then for key in pairs(registered) do if not wanted[key] then safeCall(cm.UnregisterVirtualCategory,cm,key) end end end
     registered=wanted
+    if self.status.native>0 and self.NativeSidebar then safeCall(self.NativeSidebar.Install,self.NativeSidebar) end
     if canView then
         if self.db.enabled and self.db.view then
             -- Supported hierarchy is opt-in; fall back to flat paths on stock host.
@@ -339,12 +369,15 @@ function BR:Refresh()
     if cm then safeCall(cm.RefreshVirtualCategories,cm); safeCall(cm.RefreshVirtualViews,cm) end
 end
 function BR:Preview(expr,categoryID,draft)
-    local ast,err=R.Compile(expr); if not ast then return nil,err end
+    local ast,filters,err
+    if draft and draft.filters~=nil then filters,err=F.Validate(draft.filters) else ast,err=R.Compile(expr) end
+    if not ast and not filters then return nil,err end
+    local candidate={ast=ast,filters=filters}
     local rows,counts={},{}; local unknown,total,shadowed=0,0,0
     if not (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo) then return nil,"Container API unavailable" end
     self:Invalidate()
     -- Preview may inspect a price rule not yet enabled; restore state immediately.
-    local old=self.usePrices; self.usePrices=old or needsPrices(ast)
+    local old=self.usePrices; self.usePrices=old or needsPrices(ast) or F.NeedsPrices(filters)
     for bag=0,(NUM_BAG_SLOTS or 4) do
         for slot=1,(safeCall(C_Container.GetContainerNumSlots,bag) or 0) do
             local info=safeCall(C_Container.GetContainerItemInfo,bag,slot)
@@ -354,14 +387,14 @@ function BR:Preview(expr,categoryID,draft)
                 local actual=self:ClassifyItem(item); if actual then counts[actual]=(counts[actual] or 0)+1 end
                 local selected,position=self:Get(categoryID); position=selected and (selected.tie or position) or math.huge; if draft then selected=draft end; local pinned=false
                 for _,id in ipairs(selected and selected.manual or {}) do if item.id==id then pinned=true; break end end
-                local match=pinned or R.Eval(ast,item)
+                local match=pinned or eval(candidate,item)
                 if match==nil then unknown=unknown+1 elseif match then
                     local earlier=false
                     for _,c in ipairs(compiled) do
-                        if c.id~=categoryID and ((explicit(c,item.id) and (not pinned or c.priority>(selected.priority or 0) or (c.priority==(selected.priority or 0) and c.tie<position))) or (not pinned and (not selected or c.priority>(selected.priority or 0) or (c.priority==(selected.priority or 0) and c.tie<position)) and R.Match(c.ast,item))) then earlier=true; break end
+                        if c.id~=categoryID and ((explicit(c,item.id) and (not pinned or c.priority>(selected.priority or 0) or (c.priority==(selected.priority or 0) and c.tie<position))) or (not pinned and (not selected or c.priority>(selected.priority or 0) or (c.priority==(selected.priority or 0) and c.tie<position)) and eval(c,item)==true)) then earlier=true; break end
                     end
                     if earlier then shadowed=shadowed+1 end
-                    rows[#rows+1]={name=item.name or ("Item "..info.itemID),link=info.hyperlink,count=item.count or 1,shadowed=earlier}
+                    rows[#rows+1]={name=item.name or ("Item "..info.itemID),link=info.hyperlink,count=item.count or 1,shadowed=earlier,icon=info.iconFileID or safeCall(getAPI(C_Item,"GetItemIconByID",GetItemIcon),info.itemID)}
                 end
             end
         end
@@ -385,22 +418,71 @@ local function exportLegacy(self)
 end
 function BR:Export()
     self:SyncHierarchy()
-    local a={"BAGRULES/4"}
+    local native=false;for _,c in ipairs(self.db.categories) do if c.filters~=nil then native=true end end
+    local extendedFilters=false;for _,c in ipairs(self.db.categories) do if F.Extended(c.filters) then extendedFilters=true end end
+    local a={extendedFilters and "BAGRULES/6" or native and "BAGRULES/5" or "BAGRULES/4"}
     for _,g in ipairs(self.db.sections) do a[#a+1]=table.concat({"S",g.id,encode(g.name),g.enabled and "1" or "0"},"\t") end
     local legacy=exportLegacy(self);local extended=legacy:sub(1,10)=="BAGRULES/3";local i=0
     for line in legacy:match("^[^\n]+\n?(.*)$"):gmatch("[^\n]+") do
-        i=i+1;local c=self.db.categories[i];a[#a+1]="C\t"..c.sectionID.."\t"..line..(extended and "" or "\t"..tostring(c.tie or i))
+        i=i+1;local c=self.db.categories[i];a[#a+1]=(c.filters~=nil and "N\t" or "C\t")..c.sectionID.."\t"..line..(extended and "" or "\t"..tostring(c.tie or i))
     end
-    return table.concat(a,"\n")
+    if native then for i,c in ipairs(self.db.categories) do if c.filters~=nil then a[#a+1]="F\t"..i.."\t"..encode(F.Encode(c.filters)).."!" end end end
+    local payload=table.concat(a,"\n")
+    local icons={};for _,g in ipairs(self.db.sections) do if g.icon then icons[#icons+1]="I\t"..g.id.."\t"..safeIcon(g.icon) end end
+    if #icons>0 then return "BAGRULES/7\n"..payload.."\n"..table.concat(icons,"\n") end
+    return payload
 end
-function BR:PrepareImport(s)
+function BR:PrepareImport(s, keepLegacy)
     if type(s)~="string" or #s>800000 then return nil,"Import too large" end
     s=trim(s:gsub("\r\n","\n"))
     if s:sub(1,6)=="BGR!1!" or s:sub(1,1)=="{" then
         if not self.Baganator then return nil,"Baganator importer unavailable" end
-        return self.Baganator.Plan(s)
+        local a,report=self.Baganator.Plan(s)
+        if not a or keepLegacy then return a,report end
+        local migration=self:MigrationPlan(a)
+        report.converted,report.retained=migration.ready,migration.blocked
+        report.conversionRows=migration.rows
+        report.comparedSlots=migration.slots
+        for i,row in ipairs(migration.rows) do
+            if row.filters then a[i].filters=row.filters;a[i].expr="never" end
+        end
+        return a,report
     end
     local header,body=s:match("^([^\n]+)\n?(.*)$")
+    if header=="BAGRULES/7" then
+        local inner=body:match("^([^\n]+)")
+        if inner~="BAGRULES/4" and inner~="BAGRULES/5" and inner~="BAGRULES/6" then return nil,"Invalid parent icon profile" end
+        local rows,icons={},{}
+        for line in body:gmatch("[^\n]+") do
+            if line:sub(1,2)=="I\t" then
+                local key,id=line:match("^I\t([^\t]+)\t(%d+)$");id=tonumber(id)
+                if not key or not id or safeIcon(id)~=id or icons[key] then return nil,"Invalid parent icon record" end
+                icons[key]=id
+            else rows[#rows+1]=line end
+        end
+        local a,report=self:PrepareImport(table.concat(rows,"\n"),true);if not a then return nil,report end
+        for _,g in ipairs(report.parentDefinitions or {}) do g.icon=icons[g.id];icons[g.id]=nil end
+        if next(icons) then return nil,"Unknown parent icon target" end
+        return a,report
+    end
+    if header=="BAGRULES/5" or header=="BAGRULES/6" then
+        local rows,filters,expected={},{},{};local n,ordinal=0,0
+        for line in body:gmatch("[^\n]+") do
+            if line:sub(1,2)=="F\t" then
+                local i,encoded=line:match("^F\t(%d+)\t(.*)!$");i=tonumber(i)
+                if not i or i<1 or i>100 or filters[i] then return nil,"Invalid native filter reference" end
+                local f,e=F.Decode(decode(encoded));if not f then return nil,e end;if header=="BAGRULES/5" and F.Extended(f) then return nil,"Extended filters require BAGRULES/6" end;filters[i]=f;n=n+1
+            else
+                local kind=line:sub(1,2);if kind=="C\t" or kind=="N\t" then ordinal=ordinal+1;if kind=="N\t" then expected[ordinal]=true;line="C"..line:sub(2) end end
+                rows[#rows+1]=line
+            end
+        end
+        if n==0 then return nil,"Missing native filter records" end
+        local a,report=self:PrepareImport("BAGRULES/4\n"..table.concat(rows,"\n"));if not a then return nil,report end
+        for i,f in pairs(filters) do if not expected[i] or not a[i] or a[i].expr~="never" then return nil,"Invalid native filter target" end;a[i].filters=f end
+        for i in pairs(expected) do if not filters[i] then return nil,"Missing native filter data for category "..i end end
+        return a,report
+    end
     if header=="BAGRULES/4" then
         local parents,byID,byName,rows,refs={},{},{},{},{}
         for line in body:gmatch("[^\n]+") do
@@ -448,13 +530,35 @@ function BR:PrepareImport(s)
     report.categories=#a; for _ in pairs(sectionSet) do report.sections=report.sections+1 end
     return a,report
 end
-function BR:Import(s)
-    local a,report=self:PrepareImport(s); if not a then return nil,report end
-    self.db.backup=self:Export(); self.db.categories={};self.db.sections=report.parentDefinitions or {};self.db.nextSectionID=0
+function BR:Import(s, keepLegacy)
+    if InCombatLockdown and InCombatLockdown() then return nil,"Import outside combat" end
+    local a,report=self:PrepareImport(s, keepLegacy); if not a then return nil,report end
+    self.db.backup=self:Export(); self.db.iconBackup=nil; self.db.categories={};self.db.sections=report.parentDefinitions or {};self.db.nextSectionID=0
     for _,g in ipairs(self.db.sections) do self.db.nextSectionID=math.max(self.db.nextSectionID,tonumber(g.id:match("^s(%d+)$")) or 0) end
     for _,c in ipairs(a) do self:NewCategory(c) end
     for i,c in ipairs(a) do if c.tie then self.db.categories[i].tie=c.tie end end
     self:Apply(); return true,report
+end
+function BR:StarterPlan(chosen,catalogue,replace)
+    local plan={};local count,newParents=0,0
+    for _,g in ipairs(F.Suggestions(catalogue)) do if chosen[g.name] then
+        local existing=not replace and self:FindSection(g.name);if not replace and not existing then for _,p in ipairs(self.db.sections) do if p.name:lower()==g.name:lower() then existing=p;break end end end;local seen={};if existing then for _,c in ipairs(self.db.categories) do if c.sectionID==existing.id then seen[c.name:lower()]=true end end end
+        local children={};for _,c in ipairs(g.children) do if not seen[c.name:lower()] then
+            local f,e=F.Validate(c.filters);if not f then return nil,e end;local name=cleanName(c.name);if name~="" and not seen[name:lower()] then seen[name:lower()]=true;children[#children+1]={name=name,filters=f,icon=c.icon};count=count+1 end
+        end end
+        if #children>0 then if not existing then newParents=newParents+1 end;plan[#plan+1]={name=existing and existing.name or g.name,children=children} end
+    end end
+    if (replace and 0 or #self.db.categories)+count>100 or (replace and 0 or #self.db.sections)+newParents>100 then return nil,"Not enough category capacity (100 maximum)." end
+    return plan,count
+end
+function BR:GenerateStarter(chosen,catalogue,replace)
+    if InCombatLockdown and InCombatLockdown() then return nil,"Wait until combat ends." end
+    local plan,count=self:StarterPlan(chosen,catalogue,replace);if not plan then return nil,count end
+    if count==0 then return true,0 end
+    self.db.backup=self:Export()
+    if replace then self.db.iconBackup=nil;self.db.categories={};self.db.sections={};self.db.nextSectionID=0 end
+    for _,g in ipairs(plan) do local parent=self:EnsureSection(g.name);for _,c in ipairs(g.children) do self:NewCategory({name=c.name,sectionID=parent.id,section=parent.name,expr="never",filters=c.filters,icon=c.icon,priority=replace and 0 or -10000,enabled=true}) end end
+    self:Apply();return true,count
 end
 local events=CreateFrame("Frame")
 for _,e in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_REGEN_ENABLED","BAG_UPDATE_DELAYED","GET_ITEM_INFO_RECEIVED","AUCTION_HOUSE_CLOSED","BANKFRAME_OPENED"}) do events:RegisterEvent(e) end
@@ -469,6 +573,59 @@ events:SetScript("OnEvent",function(_,event,arg)
         if not BR.db then BR:Initialize() end
         BR:Apply(); if BR.RegisterOptions then BR:RegisterOptions() end
         if BR.status and not BR.status.hasView then BR:Print("Virtual View unavailable; native categories used if supported. /bagrules status") end
-    elseif event=="PLAYER_REGEN_ENABLED" then if BR.pending then BR:Apply() elseif BR.pendingRefresh or (BR.status and BR.status.runtime and BR.db and BR.db.sectionLayout=="hierarchy") then BR:Refresh() end
+    elseif event=="PLAYER_REGEN_ENABLED" then
+        -- Capture deferred layout work before Apply clears pending flags. Delay
+        -- the refresh briefly so EUI has fully left combat lockdown before the
+        -- runtime hierarchy and native sidebar are measured and rebuilt.
+        local refresh=BR.pendingRefresh or (BR.status and (BR.status.native>0 or BR.status.runtime and BR.db and BR.db.sectionLayout=="hierarchy"))
+        if BR.pending then BR:Apply() end
+        if refresh then scheduleRefresh() end
     elseif BR.db and BR.db.enabled and (event=="BAG_UPDATE_DELAYED" or event=="GET_ITEM_INFO_RECEIVED" or event=="AUCTION_HOUSE_CLOSED" or event=="BANKFRAME_OPENED") then scheduleRefresh() end
 end)
+
+-- Explicit, conservative conversion of the already-imported BagRules expression.
+-- The original Baganator import warnings remain attached to the category.
+function BR:MigrationPlan(categories)
+    categories=categories or self.db.categories
+    local rows,items={},{};local available=C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo
+    local old=self.usePrices;local priceNeeded=old
+    for _,c in ipairs(categories) do if c.filters==nil and needsPrices(R.Compile(c.expr)) then priceNeeded=true end end
+    self.usePrices=priceNeeded;self:Invalidate()
+    if available then
+        for bag=0,(NUM_BAG_SLOTS or 4) do for slot=1,(safeCall(C_Container.GetContainerNumSlots,bag) or 0) do
+            local info=safeCall(C_Container.GetContainerItemInfo,bag,slot)
+            if info and info.itemID then items[#items+1]=self:Item(info.hyperlink,info.itemID,bag,slot,info.quality) end
+        end end
+    end
+    self.usePrices=old;self:Invalidate()
+    local report={rows=rows,ready=0,blocked=0,native=0,slots=#items,available=not not available,snapshot=categories==self.db.categories and self:Export() or nil}
+    for _,c in ipairs(categories) do
+        local row={id=c.id,name=c.name,section=c.section,warning=c.warning,matched=0,mismatches=0,unknown=0};rows[#rows+1]=row
+        if c.filters~=nil then row.status="Native";report.native=report.native+1
+        else
+            local f,e=F.Translate(c.expr);row.filters=f
+            if f then
+                local ast=R.Compile(c.expr)
+                for _,item in ipairs(items) do local a,b=R.Eval(ast,item),F.Eval(f,item);if a~=b then row.mismatches=row.mismatches+1 end;if a==true then row.matched=row.matched+1 elseif a==nil then row.unknown=row.unknown+1 end end
+                if row.mismatches>0 then row.filters=nil;row.reason="Current inventory comparison differs" end
+            else row.reason=e end
+            if row.filters then row.status="Ready";report.ready=report.ready+1 else row.status="Legacy retained";report.blocked=report.blocked+1 end
+        end
+    end
+    return report
+end
+function BR:ConvertLegacy(ids,snapshot)
+    if InCombatLockdown and InCombatLockdown() then return nil,"Convert outside combat" end
+    if snapshot~=self:Export() then return nil,"Profile changed; refresh preview" end
+    local plan=self:MigrationPlan();local ready={};for _,r in ipairs(plan.rows) do if r.filters and (not ids or ids[r.id]) then ready[#ready+1]=r end end
+    if #ready==0 then return nil,"No compatible legacy categories selected" end
+    local backup=self:Export();self.db.migrationBackup=backup;self.db.backup=backup
+    for _,r in ipairs(ready) do local c,i=self:Get(r.id);local replacement=copy(c);replacement.filters=r.filters;replacement.expr="never";self.db.categories[i]=replacement end
+    self:Apply();return true,#ready
+end
+function BR:RestoreMigration(snapshot)
+    if InCombatLockdown and InCombatLockdown() then return nil,"Restore outside combat" end
+    if snapshot~=self:Export() then return nil,"Profile changed; refresh preview" end
+    local backup=self.db.migrationBackup;if not backup then return nil,"No migration backup" end
+    local ok,report=self:Import(backup);if ok then self.db.migrationBackup=nil end;return ok,report
+end

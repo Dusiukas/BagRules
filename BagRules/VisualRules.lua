@@ -25,6 +25,7 @@ function V.Choices(field)
  if R.fields[field]=='bool' then return {'Yes','No'} end
  if field=='quality' then return V.quality end
  if field=='class' then return {'0 - Consumable','1 - Container','2 - Weapon','3 - Gem','4 - Armor','5 - Reagent','6 - Projectile','7 - Trade Goods','9 - Recipe','11 - Quiver','12 - Quest','13 - Key','15 - Miscellaneous'} end
+ if field=='subtype' then return {'Cloth','Leather','Metal & Stone','Herb','Cooking','Elemental','Enchanting','Jewelcrafting','Parts','Explosives','Devices','Potion','Elixir','Flask','Food & Drink','Bandage','Other / enter text'} end
  if field=='type' then return {'Trade Goods','Weapon','Armor','Consumable','Container','Recipe','Quest','Reagent','Miscellaneous','Projectile','Gem','Quiver','Item Enhancement','Other / enter text'} end
 end
 function V.Value(n)

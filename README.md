@@ -2,6 +2,14 @@
 
 > **Alpha software:** BagRules is under active development. Features, interfaces, compatibility, and data formats may change between releases.
 
+## Current alpha: 0.7.4-alpha.1
+
+The repository now contains the complete 0.7.4 development source plus a combat hierarchy hotfix. BagRules preserves its last valid green parent headers and grouped sidebar during combat, then schedules a clean rebuild immediately after combat ends.
+
+The generated local icon filename index is not included in public source or packages because redistribution permission remains unresolved. Icon browsing continues to use client-discovered metadata and the optional `IconFileNames` addon.
+
+Aggregate/selectable parent views were described for an unrecovered 0.7.5 build and are not claimed by this release.
+
 **Your bags. Your categories. Your rules.**
 
 BagRules is an advanced inventory management addon for World of Warcraft, developed as part of **EllesmereUI (EUI)**. It gives players greater control over how items are categorized, organized, and displayed through customizable categories, subcategories, rule-based organization, and intelligent icon selection.
@@ -30,14 +38,14 @@ See the [BagRules screenshot gallery](SCREENSHOTS.md) for the category manager, 
 
 - Create custom categories and subcategories.
 - Organize items using configurable rules.
-- Select parent categories to display all associated subcategories, or browse individual subcategories.
+- Group subcategories under collapsible parent headers, or browse individual subcategories.
 - Customize category and subcategory names and icons.
 - Register native virtual bag categories using a hierarchical structure.
 
 ### Advanced icon browser
 
 - Browse an extensive collection of World of Warcraft icons.
-- Search across the entire icon database.
+- Search across the client-discovered icon catalogue and available metadata.
 - Explore thematic icon categories.
 - Scroll continuously through available icons without pagination.
 - Assign icons to individual categories and subcategories.

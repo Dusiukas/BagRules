@@ -334,9 +334,17 @@ end
 S.ownFrames=setmetatable({}, {__mode='k'})
 function S:AfterRefresh(bag)
     if self.busy then return end
-    self:HideHeaders()
-    if not bag:IsVisible() or not BR.db or not BR.db.enabled or not BR.db.view or BR.db.sectionLayout~='hierarchy' or self.failed then return end
-    if combat() or hasCursor() or activeCatch(bag) or bag.IsListMode() then self.state='flat (combat, cursor, selection or list mode)'; return end
+    if not bag:IsVisible() or not BR.db or not BR.db.enabled or not BR.db.view or BR.db.sectionLayout~='hierarchy' or self.failed then
+        self.deferred=false; self:HideHeaders(); return
+    end
+    -- Preserve the last validated hierarchy during combat. RefreshInventory can
+    -- run while protected frames cannot safely be reflowed; hiding our headings
+    -- here exposed the host's flat labels until combat ended.
+    if combat() then
+        self.deferred=true; BR.pendingRefresh=true; self.state='deferred (combat)'; return
+    end
+    self.deferred=false; self:HideHeaders()
+    if hasCursor() or activeCatch(bag) or bag.IsListMode() then self.state='flat (cursor, selection or list mode)'; return end
     local view,reason=self:Selected(bag); if not view then self.state='flat: '..tostring(reason); return end
     if not bag._scrollChild or type(bag._scrollChild.GetHeight)~='function' then self.state='flat: scroll child geometry unavailable'; return end
     local child=bag._scrollChild
@@ -365,7 +373,13 @@ function S:AfterRefresh(bag)
         -- Pre-create only plain header buttons. Never create or alter a secure item button.
         for i,h in ipairs(plan.headers) do
             local b=self:Header(i,child); b:ClearAllPoints(); b:SetPoint('TOPLEFT',child,'TOPLEFT',h.x,h.y); b:SetWidth(h.w)
-            b.section=h.name; b.text:SetText((h.collapsed and '+ ' or '- ')..h.name); b:Hide()
+            b.section=h.name; b.text:SetText((h.collapsed and '+ ' or '- ')..h.name)
+            local parent=BR.FindSection and BR:FindSection(h.name)
+            if parent and parent.icon then
+                if not b.parentIcon then b.parentIcon=b:CreateTexture(nil,'ARTWORK');b.parentIcon:SetWidth(16);b.parentIcon:SetHeight(16);b.parentIcon:SetPoint('LEFT',b,'LEFT',0,0) end
+                b.parentIcon:SetTexture(parent.icon);b.parentIcon:Show();b.text:ClearAllPoints();b.text:SetPoint('LEFT',b,'LEFT',20,0)
+            elseif b.parentIcon then b.parentIcon:Hide();b.text:ClearAllPoints();b.text:SetPoint('LEFT',b,'LEFT',0,0) end
+            b:Hide()
         end
         for _,m in ipairs(plan.moves) do
             local p=m.p; local f=p.f
