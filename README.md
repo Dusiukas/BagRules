@@ -6,6 +6,10 @@ BagRules is an advanced inventory management addon for World of Warcraft, develo
 
 Designed for flexibility and integration with the native inventory experience, BagRules lets players build an inventory hierarchy that suits their playstyle.
 
+## Screenshots
+
+See the [BagRules screenshot gallery](SCREENSHOTS.md) for the category manager, hierarchical bag view, and searchable icon browser.
+
 ## Features
 
 ### Custom inventory organization
